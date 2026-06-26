@@ -43,14 +43,11 @@ import { WpClient } from './services/wpClient/wpClient.js';
 
 /**
  * ライセンス署名検証用の公開鍵（Ed25519・SPKI/PEM）。
- * ※ これは開発用のダミー鍵。本番では発行サーバー（Firebase Function）の公開鍵に差し替える。
+ * dev 発行サーバー（mcp-switchpoint-wp-dev）の鍵。秘密鍵は Secret Manager の LICENSE_PRIVATE_KEY。
+ * ※ prod 配布時は mcp-switchpoint-wp-prod の公開鍵に差し替える（dev/prod は別鍵ペア）。
  */
-// const LICENSE_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
-// MCowBQYDK2VwAyEAzxDlfbzrXYQJqzte3gFdpr4/IWjKAmgCVus9eMUWxkE=
-// -----END PUBLIC KEY-----`;
-
 const LICENSE_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
-MCowBQYDK2VwAyEAvjcWHErNfVEs8HDT+wkkyaFPUDtFPJVi9kfKjXDeXLo=
+MCowBQYDK2VwAyEAzpngEDn8q4PH6eKDFUNYA9U805d20BmSKFf6t4H8X9s=
 -----END PUBLIC KEY-----`;
 
 function makeProcessController(): ProcessController {
