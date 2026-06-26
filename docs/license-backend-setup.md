@@ -43,9 +43,22 @@ firebase functions:secrets:set LICENSE_PRIVATE_KEY
 ```
 
 ### 4. Stripe 拡張をインストール
+> ⚠ `stripe/firestore-stripe-payments` は Stripe から **Invertase へ移管（旧版はディプリケート）**。
+> **`invertase/firestore-stripe-payments`**（2026-06 時点 v0.3.12）を使う。中身・Firestore 構造・
+> パラメータは同一。`ext:install` は対話のみのため**通常ターミナル**で実行（Claude の `!` 不可）。
+
 ```bash
-firebase ext:install stripe/firestore-stripe-payments --project=mcp-switchpoint-wp-dev
+firebase ext:install invertase/firestore-stripe-payments --project=mcp-switchpoint-wp-dev
+firebase deploy --only extensions --project=mcp-switchpoint-wp-dev
 ```
+
+> 新規プロジェクトでは初回デプロイが Artifact Registry 権限不足（403）で失敗することがある。
+> その場合は既定 Compute SA に権限を付与してから再デプロイ:
+> ```bash
+> gcloud projects add-iam-policy-binding mcp-switchpoint-wp-dev \
+>   --member="serviceAccount:<PROJECT_NUMBER>-compute@developer.gserviceaccount.com" \
+>   --role="roles/artifactregistry.reader"
+> ```
 設定の要点:
 - **Products and pricing plans collection**: `products`
 - **Customer details and subscriptions collection**: `customers`

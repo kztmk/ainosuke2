@@ -3,5 +3,13 @@
     "default": "mcp-switchpoint-wp-dev",
     "dev": "mcp-switchpoint-wp-dev",
     "prod": "mcp-switchpoint-wp-prod"
+  },
+  "targets": {},
+  "etags": {
+    "mcp-switchpoint-wp-dev": {
+      "extensionInstances": {
+        "firestore-stripe-payments": "21db8ecf91303ed214228eb695c20335ca5b7fce6240ab0e447d754455d9d21d"
+      }
+    }
   }
 }
