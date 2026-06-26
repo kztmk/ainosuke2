@@ -1,0 +1,39 @@
+rules_version = '2';
+
+// firestore-stripe-payments 拡張が customers/{uid} 配下に顧客・サブスク状態を書き込む。
+// devices サブコレクションは本アプリの issueLicense Function（Admin SDK = ルール迂回）だけが書き込む。
+// クライアントからの直接書き込みは checkout_sessions（拡張のWeb決済フロー）以外すべて禁止。
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    match /customers/{uid} {
+      allow read: if request.auth != null && request.auth.uid == uid;
+
+      // 拡張のWeb Checkoutフロー：クライアントがセッション要求ドキュメントを作成する
+      match /checkout_sessions/{id} {
+        allow read, write: if request.auth != null && request.auth.uid == uid;
+      }
+      match /subscriptions/{id} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+      }
+      match /payments/{id} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+      }
+      // 端末登録は閲覧のみ許可（書き込み/削除は Functions 経由）
+      match /devices/{id} {
+        allow read: if request.auth != null && request.auth.uid == uid;
+      }
+    }
+
+    // 拡張が同期する商品/価格は公開読み取り
+    match /products/{id} {
+      allow read: if true;
+      match /prices/{id} {
+        allow read: if true;
+      }
+      match /tax_rates/{id} {
+        allow read: if true;
+      }
+    }
+  }
+}

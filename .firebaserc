@@ -1,0 +1,7 @@
+{
+  "projects": {
+    "default": "mcp-switchpoint-wp-dev",
+    "dev": "mcp-switchpoint-wp-dev",
+    "prod": "mcp-switchpoint-wp-prod"
+  }
+}
