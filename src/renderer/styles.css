@@ -1,0 +1,8 @@
+@import 'tailwindcss';
+
+/* ダークモードは class 戦略（§8.5）。html.dark で切り替える。 */
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  color-scheme: light dark;
+}
