@@ -19,7 +19,10 @@ import { McpClient } from '../services/mcpClient/mcpClient.js';
 import { EntitlementService } from '../services/entitlement/entitlement.js';
 import { ClaudeDesktopService } from '../services/claudeDesktop/claudeDesktop.js';
 import { Logger, type LogEntry, type LogStore } from '../services/logger/logger.js';
-import { DEFAULT_SETTINGS, type AppSettings, type SiteRecord } from '../../shared/domain.js';
+import { TemplateStore, type TemplateBackend } from '../services/templateStore/templateStore.js';
+import { LicenseService, type LicenseKv } from '../services/license/license.js';
+import { generateKeyPairSync } from 'node:crypto';
+import { DEFAULT_SETTINGS, type AppSettings, type ArticleTemplate, type SiteRecord } from '../../shared/domain.js';
 import type { SiteInput } from '../../shared/ipc.js';
 
 // --- フェイク群 -----------------------------------------------------------
@@ -144,6 +147,21 @@ async function makeApp(fetchFn: FetchLike = routerFetch()): Promise<Harness> {
       },
     }),
     logger: new Logger(new MemoryLogStore(), clock),
+    templates: new TemplateStore(
+      ((): TemplateBackend => {
+        let items: ArticleTemplate[] = [];
+        return { read: () => [...items], write: (t) => (items = [...t]) };
+      })(),
+      () => `tpl-${++idSeq}`,
+      clock,
+    ),
+    license: new LicenseService(
+      generateKeyPairSync('ed25519').publicKey,
+      ((): LicenseKv => {
+        const m = new Map<string, string>();
+        return { get: (k) => m.get(k), set: (k, v) => m.set(k, v), delete: (k) => m.delete(k) };
+      })(),
+    ),
     settings,
     openExternal: vi.fn(async () => {}),
     emitSiteStatus: emit,

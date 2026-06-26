@@ -59,6 +59,18 @@ const api: IpcApi = {
   warnings: {
     list: () => ipcRenderer.invoke(IPC_INVOKE.warningsList),
   },
+  templates: {
+    list: () => ipcRenderer.invoke(IPC_INVOKE.templatesList),
+    create: (input) => ipcRenderer.invoke(IPC_INVOKE.templatesCreate, input),
+    update: (id, input) => ipcRenderer.invoke(IPC_INVOKE.templatesUpdate, id, input),
+    remove: (id) => ipcRenderer.invoke(IPC_INVOKE.templatesRemove, id),
+  },
+  license: {
+    status: () => ipcRenderer.invoke(IPC_INVOKE.licenseStatus),
+    deviceId: () => ipcRenderer.invoke(IPC_INVOKE.licenseDeviceId),
+    activate: (token) => ipcRenderer.invoke(IPC_INVOKE.licenseActivate, token),
+    deactivate: () => ipcRenderer.invoke(IPC_INVOKE.licenseDeactivate),
+  },
   shell: {
     openExternal: (url) => ipcRenderer.invoke(IPC_INVOKE.shellOpenExternal, url),
   },

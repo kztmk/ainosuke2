@@ -2,7 +2,8 @@
 import { useTranslation } from 'react-i18next';
 import { useApp } from '../state.js';
 import { Button, Card, Field, Select, TextInput } from './ui.js';
-import type { ThemePref } from '../../shared/domain.js';
+import { LicenseSection } from './LicenseSection.js';
+import type { Locale, ThemePref } from '../../shared/domain.js';
 
 export function SettingsView(): JSX.Element {
   const { settings, updateSettings, configPath, openExternal } = useApp();
@@ -10,9 +11,22 @@ export function SettingsView(): JSX.Element {
   if (!settings) return <div className="p-6 text-sm text-zinc-500">{t('settings.loading')}</div>;
 
   return (
-    <div className="flex-1 overflow-y-auto p-6">
-      <h2 className="mb-4 text-lg font-semibold">{t('settings.title')}</h2>
+    <div className="flex-1 space-y-4 overflow-y-auto p-6">
+      <h2 className="text-lg font-semibold">{t('settings.title')}</h2>
+
+      <LicenseSection />
+
       <Card className="max-w-lg space-y-4 p-5">
+        <Field label={t('settings.language')}>
+          <Select
+            value={settings.language}
+            onChange={(e) => void updateSettings({ language: e.target.value as Locale })}
+          >
+            <option value="ja">{t('settings.languageJa')}</option>
+            <option value="en">{t('settings.languageEn')}</option>
+          </Select>
+        </Field>
+
         <Field label={t('settings.theme')}>
           <Select
             value={settings.theme}

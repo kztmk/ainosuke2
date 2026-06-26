@@ -13,7 +13,7 @@ function localizeError(reason: string, fallback: string): string {
   return translated === key ? fallback : translated;
 }
 
-export type View = 'main' | 'settings' | 'log';
+export type View = 'main' | 'settings' | 'log' | 'templates';
 
 export interface Toast {
   message: string;
@@ -95,6 +95,7 @@ export function AppStateProvider({ children }: { children: ReactNode }): JSX.Ele
       setClaudeDetected(detected);
       setConfigPath(cfg);
       applyTheme(s.theme);
+      void i18n.changeLanguage(s.language);
       if (list.length > 0) setSelectedId((prev) => prev ?? list[0]!.id);
     })();
   }, []);
@@ -212,6 +213,7 @@ export function AppStateProvider({ children }: { children: ReactNode }): JSX.Ele
     const next = await window.api.settings.update(patch);
     setSettings(next);
     if (patch.theme) applyTheme(next.theme);
+    if (patch.language) void i18n.changeLanguage(next.language);
   }, []);
 
   const openExternal = useCallback<AppState['openExternal']>((url) => {

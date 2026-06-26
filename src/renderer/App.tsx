@@ -7,6 +7,7 @@ import { SiteDetail } from './components/SiteDetail.js';
 import { SiteDialog } from './components/SiteDialog.js';
 import { SettingsView } from './components/SettingsView.js';
 import { LogView } from './components/LogView.js';
+import { TemplatesView } from './components/TemplatesView.js';
 import { Button, Modal } from './components/ui.js';
 
 type DialogState = { mode: 'add' } | { mode: 'edit'; site: Site } | null;
@@ -35,6 +36,7 @@ export function App(): JSX.Element {
               {t('main.emptyHint')}
             </div>
           ))}
+        {view === 'templates' && <TemplatesView />}
         {view === 'settings' && <SettingsView />}
         {view === 'log' && <LogView />}
       </main>

@@ -18,7 +18,24 @@ import { McpClient } from './services/mcpClient/mcpClient.js';
 import { EntitlementService } from './services/entitlement/entitlement.js';
 import { ClaudeDesktopService, type ProcessController } from './services/claudeDesktop/claudeDesktop.js';
 import { Logger, type LogStore } from './services/logger/logger.js';
-import { DEFAULT_SETTINGS, type AppSettings, type LogEntry, type Site, type SiteRecord } from '../shared/domain.js';
+import { TemplateStore, type TemplateBackend } from './services/templateStore/templateStore.js';
+import { LicenseService, type LicenseKv } from './services/license/license.js';
+import {
+  DEFAULT_SETTINGS,
+  type AppSettings,
+  type ArticleTemplate,
+  type LogEntry,
+  type Site,
+  type SiteRecord,
+} from '../shared/domain.js';
+
+/**
+ * ライセンス署名検証用の公開鍵（Ed25519・SPKI/PEM）。
+ * ※ これは開発用のダミー鍵。本番では発行サーバー（Firebase Function）の公開鍵に差し替える。
+ */
+const LICENSE_PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEAzxDlfbzrXYQJqzte3gFdpr4/IWjKAmgCVus9eMUWxkE=
+-----END PUBLIC KEY-----`;
 
 function makeProcessController(): ProcessController {
   const run = (cmd: string) =>
@@ -54,6 +71,17 @@ export function buildAppService(emitSiteStatus?: (site: Site) => void): AppServi
     write: (s) => store.set('settings', s),
   };
 
+  const templateBackend: TemplateBackend = {
+    read: () => store.get('templates', []) as ArticleTemplate[],
+    write: (templates) => store.set('templates', templates),
+  };
+
+  const licenseKv: LicenseKv = {
+    get: (key) => store.get(key) as string | undefined,
+    set: (key, value) => store.set(key, value),
+    delete: (key) => store.delete(key),
+  };
+
   const claude = new ClaudeDesktopService({
     platform: process.platform,
     env: process.env,
@@ -71,6 +99,8 @@ export function buildAppService(emitSiteStatus?: (site: Site) => void): AppServi
     entitlement: new EntitlementService({ tier: 'free', enforcementEnabled: false }),
     claude,
     logger: new Logger(logBackend),
+    templates: new TemplateStore(templateBackend, () => randomUUID()),
+    license: new LicenseService(LICENSE_PUBLIC_KEY, licenseKv, { idFactory: () => randomUUID() }),
     settings,
     openExternal: (url) => shell.openExternal(url),
     emitSiteStatus,

@@ -9,13 +9,22 @@
  */
 import type {
   AppSettings,
+  ArticleTemplate,
   AuthMethod,
   Feature,
+  LicenseStatus,
   LogEntry,
   LogType,
   Site,
   SiteWarning,
 } from './domain.js';
+
+/** Stripe 決済ページ（Pro へのアップグレード導線・§12.2）。発行サーバー確定時に差し替える。 */
+export const CHECKOUT_URL = 'https://example.com/checkout';
+
+export type LicenseActivateResult =
+  | { ok: true }
+  | { ok: false; reason: 'malformed' | 'invalid_signature' | 'expired' };
 
 /** サイト作成/編集の入力。認証情報（平文）は含めず secret.set で別途渡す。 */
 export interface SiteInput {
@@ -74,6 +83,11 @@ export type TestTarget =
 export interface LogFilter {
   siteId?: string;
   type?: LogType;
+}
+
+export interface TemplateInput {
+  name: string;
+  body: string;
 }
 
 /** 自動再起動の推奨（§5.2.2・デバウンス後にまとめて通知）。 */
@@ -144,6 +158,22 @@ export interface IpcApi {
     list(): Promise<SiteWarning[]>;
   };
 
+  /** 記事テンプレート管理（Pro・§12.1）。 */
+  templates: {
+    list(): Promise<ArticleTemplate[]>;
+    create(input: TemplateInput): Promise<ArticleTemplate>;
+    update(id: string, input: TemplateInput): Promise<ArticleTemplate | null>;
+    remove(id: string): Promise<void>;
+  };
+
+  /** Pro ライセンス（§12.2）。入手手段は将来 Firebase Auth に差し替え（LicenseProvider）。 */
+  license: {
+    status(): Promise<LicenseStatus>;
+    deviceId(): Promise<string>;
+    activate(token: string): Promise<LicenseActivateResult>;
+    deactivate(): Promise<void>;
+  };
+
   shell: {
     /** OS 既定ブラウザで開く（§5.1.4）。 */
     openExternal(url: string): Promise<void>;
@@ -187,6 +217,14 @@ export const IPC_INVOKE = {
   logList: 'log:list',
   logExportCsv: 'log:exportCsv',
   warningsList: 'warnings:list',
+  templatesList: 'templates:list',
+  templatesCreate: 'templates:create',
+  templatesUpdate: 'templates:update',
+  templatesRemove: 'templates:remove',
+  licenseStatus: 'license:status',
+  licenseDeviceId: 'license:deviceId',
+  licenseActivate: 'license:activate',
+  licenseDeactivate: 'license:deactivate',
   shellOpenExternal: 'shell:openExternal',
 } as const;
 

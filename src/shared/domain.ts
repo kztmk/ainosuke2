@@ -11,6 +11,9 @@ export type Tier = 'free' | 'pro';
 
 export type ThemePref = 'light' | 'dark' | 'system';
 
+/** 表示言語（§8.5・Phase 1 は ja のみ、Phase 3 で切替 UI）。 */
+export type Locale = 'ja' | 'en';
+
 /** ゲート対象機能（PRO_FEATURES に無いものは Free でも使える・ADR-0004 / 12.1）。 */
 export type Feature =
   // Pro 限定
@@ -109,6 +112,42 @@ export interface Site extends SiteRecord {
   summary: SiteSummary | null;
 }
 
+/** Pro ライセンスの同時利用台数上限（§12.2・サーバー側で発行時に強制）。 */
+export const MAX_DEVICES = 3;
+/** オフライン猶予日数（§12.2：再検証できない間も動作継続する期間）。 */
+export const LICENSE_OFFLINE_GRACE_DAYS = 14;
+
+/** ライセンストークンのクレーム（発行サーバーが署名・アプリが公開鍵で検証）。 */
+export interface LicenseClaims {
+  tier: 'pro';
+  userId: string;
+  deviceId: string;
+  /** 発行時刻（unix 秒） */
+  iat: number;
+  /** 失効時刻（unix 秒） */
+  exp: number;
+}
+
+/** アプリが提示するライセンス状態。 */
+export interface LicenseStatus {
+  tier: Tier;
+  activated: boolean;
+  reason: 'none' | 'valid' | 'grace' | 'expired' | 'invalid';
+  expiresAt: string | null;
+  userId: string | null;
+  deviceId: string | null;
+}
+
+/** 記事テンプレート（Pro・§12.1）。Claude への指示に再利用する雛形テキスト。 */
+export interface ArticleTemplate {
+  id: string;
+  name: string;
+  /** 雛形本文（構成・トーン・カテゴリ指定などを含むプロンプト） */
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AppSettings {
   /** 疎通確認間隔（分・既定 30） */
   pollIntervalMinutes: number;
@@ -119,6 +158,8 @@ export interface AppSettings {
   /** 接続継続の警告閾値（時間・既定 24・OFF=null） */
   connectionWarnThresholdHours: number | null;
   theme: ThemePref;
+  /** 表示言語（§8.5） */
+  language: Locale;
   /** ピン留めする mcp-wordpress-remote のバージョン（未決#3・完全固定） */
   pinnedRemoteVersion: string;
 }
@@ -130,6 +171,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   logRetentionDays: 7,
   connectionWarnThresholdHours: 24,
   theme: 'system',
+  language: 'ja',
   pinnedRemoteVersion: '0.3.5',
 };
 

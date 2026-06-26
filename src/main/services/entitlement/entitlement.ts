@@ -37,6 +37,11 @@ export class EntitlementService {
     this.state = state;
   }
 
+  /** ライセンス判定の結果を反映する（enforcement フラグは保持）。 */
+  setTier(tier: Tier): void {
+    this.state = { ...this.state, tier };
+  }
+
   get tier(): Tier {
     return this.state.tier;
   }

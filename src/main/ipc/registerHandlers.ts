@@ -5,7 +5,7 @@
 import { ipcMain } from 'electron';
 import { IPC_INVOKE } from '../../shared/ipc.js';
 import type { AppService } from '../appService/appService.js';
-import type { LogFilter, SiteInput, TestTarget } from '../../shared/ipc.js';
+import type { LogFilter, SiteInput, TemplateInput, TestTarget } from '../../shared/ipc.js';
 import type { AppSettings, Feature } from '../../shared/domain.js';
 
 export function registerHandlers(app: AppService): void {
@@ -42,6 +42,16 @@ export function registerHandlers(app: AppService): void {
   h(IPC_INVOKE.logExportCsv, (_e, filter?: LogFilter) => app.exportLogsCsv(filter));
 
   h(IPC_INVOKE.warningsList, () => app.getWarnings());
+
+  h(IPC_INVOKE.templatesList, () => app.templatesList());
+  h(IPC_INVOKE.templatesCreate, (_e, input: TemplateInput) => app.templatesCreate(input));
+  h(IPC_INVOKE.templatesUpdate, (_e, id: string, input: TemplateInput) => app.templatesUpdate(id, input));
+  h(IPC_INVOKE.templatesRemove, (_e, id: string) => app.templatesRemove(id));
+
+  h(IPC_INVOKE.licenseStatus, () => app.licenseStatus());
+  h(IPC_INVOKE.licenseDeviceId, () => app.licenseDeviceId());
+  h(IPC_INVOKE.licenseActivate, (_e, token: string) => app.licenseActivate(token));
+  h(IPC_INVOKE.licenseDeactivate, () => app.licenseDeactivate());
 
   h(IPC_INVOKE.shellOpenExternal, (_e, url: string) => app.shellOpenExternal(url));
 }

@@ -32,7 +32,10 @@ import type { McpClient } from '../services/mcpClient/mcpClient.js';
 import type { EntitlementService } from '../services/entitlement/entitlement.js';
 import type { ClaudeDesktopService } from '../services/claudeDesktop/claudeDesktop.js';
 import type { Logger } from '../services/logger/logger.js';
-import type { Feature } from '../../shared/domain.js';
+import type { TemplateStore } from '../services/templateStore/templateStore.js';
+import type { LicenseService } from '../services/license/license.js';
+import type { ArticleTemplate, Feature, LicenseStatus } from '../../shared/domain.js';
+import type { LicenseActivateResult, TemplateInput } from '../../shared/ipc.js';
 
 export interface SettingsStore {
   read(): AppSettings;
@@ -48,6 +51,8 @@ export interface AppServiceDeps {
   entitlement: EntitlementService;
   claude: ClaudeDesktopService;
   logger: Logger;
+  templates: TemplateStore;
+  license: LicenseService;
   settings: SettingsStore;
   openExternal: (url: string) => Promise<void>;
   /** ステータス更新を renderer へプッシュする（§5.3.2 リアルタイム表示）。 */
@@ -70,6 +75,12 @@ export class AppService {
   constructor(deps: AppServiceDeps) {
     this.d = deps;
     this.now = deps.now ?? (() => new Date());
+    this.applyLicense();
+  }
+
+  /** ライセンス判定を entitlement の tier へ反映（起動時・アクティベーション時）。 */
+  private applyLicense(): void {
+    this.d.entitlement.setTier(this.d.license.getStatus().tier);
   }
 
   // --- Site DTO 組み立て ---------------------------------------------------
@@ -356,6 +367,49 @@ export class AppService {
     const next = { ...this.d.settings.read(), ...patch };
     this.d.settings.write(next);
     return next;
+  }
+
+  // --- templates（§12.1・Pro） ---
+
+  templatesList(): ArticleTemplate[] {
+    return this.d.templates.list();
+  }
+
+  templatesCreate(input: TemplateInput): ArticleTemplate {
+    return this.d.templates.create(input);
+  }
+
+  templatesUpdate(id: string, input: TemplateInput): ArticleTemplate | null {
+    return this.d.templates.update(id, input);
+  }
+
+  templatesRemove(id: string): void {
+    this.d.templates.remove(id);
+  }
+
+  // --- license（§12.2） ---
+
+  licenseStatus(): LicenseStatus {
+    return this.d.license.getStatus();
+  }
+
+  /** この端末の ID（発行サーバーでの台数管理・登録用に表示）。 */
+  licenseDeviceId(): string {
+    return this.d.license.getDeviceId();
+  }
+
+  licenseActivate(token: string): LicenseActivateResult {
+    const res = this.d.license.activate(token);
+    if (res.ok) {
+      this.applyLicense();
+      return { ok: true };
+    }
+    return { ok: false, reason: res.reason };
+  }
+
+  licenseDeactivate(): void {
+    this.d.license.deactivate();
+    this.applyLicense();
   }
 
   entitlementCan(feature: Feature): boolean {

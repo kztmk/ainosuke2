@@ -1,5 +1,11 @@
 /** 最小の共通 UI プリミティブ（Tailwind・light/dark 対応）。shadcn 導入時に差し替え可能。 */
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from 'react';
+import type {
+  ButtonHTMLAttributes,
+  InputHTMLAttributes,
+  ReactNode,
+  SelectHTMLAttributes,
+  TextareaHTMLAttributes,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import type { HealthStatus } from '../../shared/domain.js';
 
@@ -78,6 +84,18 @@ export function Field({
 export function TextInput({ className, ...props }: InputHTMLAttributes<HTMLInputElement>): JSX.Element {
   return (
     <input
+      {...props}
+      className={cn(
+        'w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm outline-none placeholder:text-zinc-400 focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:placeholder:text-zinc-600',
+        className,
+      )}
+    />
+  );
+}
+
+export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>): JSX.Element {
+  return (
+    <textarea
       {...props}
       className={cn(
         'w-full rounded-md border border-zinc-300 bg-white px-3 py-1.5 text-sm outline-none placeholder:text-zinc-400 focus:border-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:placeholder:text-zinc-600',

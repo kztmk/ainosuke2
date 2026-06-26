@@ -73,6 +73,12 @@ export function Sidebar({ onAdd }: { onAdd: () => void }): JSX.Element {
 
       <div className="border-t border-zinc-200 p-2 text-sm dark:border-zinc-800">
         <button
+          onClick={() => setView('templates')}
+          className={cn('block w-full rounded-md px-2 py-1.5 text-left hover:bg-zinc-50 dark:hover:bg-zinc-900', view === 'templates' && 'bg-zinc-100 dark:bg-zinc-800')}
+        >
+          {t('nav.templates')}
+        </button>
+        <button
           onClick={() => setView('settings')}
           className={cn('block w-full rounded-md px-2 py-1.5 text-left hover:bg-zinc-50 dark:hover:bg-zinc-900', view === 'settings' && 'bg-zinc-100 dark:bg-zinc-800')}
         >

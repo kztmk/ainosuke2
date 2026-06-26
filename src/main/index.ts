@@ -4,6 +4,7 @@
  */
 import { app, BrowserWindow, Menu, nativeImage, Tray } from 'electron';
 import { fileURLToPath } from 'node:url';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { buildAppService } from './realDeps.js';
 import { registerHandlers } from './ipc/registerHandlers.js';
@@ -16,6 +17,21 @@ let mainWindow: BrowserWindow | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
 
+/**
+ * アプリアイコン（docs/ainosuke2.png）を読み込む。見つからなければ null。
+ * ※ Phase 4 のパッケージング時は resources/ へ移し electron-builder の icon 設定に揃える。
+ */
+function loadAppIcon(): Electron.NativeImage | null {
+  try {
+    const p = path.join(app.getAppPath(), 'docs', 'ainosuke2.png');
+    if (!existsSync(p)) return null;
+    const img = nativeImage.createFromPath(p);
+    return img.isEmpty() ? null : img;
+  } catch {
+    return null;
+  }
+}
+
 function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1024,
@@ -23,6 +39,7 @@ function createWindow(): BrowserWindow {
     minWidth: 880,
     minHeight: 560,
     title: 'WP MCP Manager',
+    ...(loadAppIcon() ? { icon: loadAppIcon()! } : {}),
     webPreferences: {
       preload: path.join(__dirname, '../preload/index.mjs'),
       contextIsolation: true,
@@ -61,10 +78,12 @@ function makeTrayIcon(): Electron.NativeImage {
   return img;
 }
 
-/** §5.4.1 システムトレイ常駐。アイコン生成に失敗してもクラッシュさせない。 */
+/** §5.4.1 システムトレイ常駐。アプリアイコンを優先し、無ければ生成アイコンにフォールバック。 */
 function setupTray(win: BrowserWindow): void {
   try {
-    tray = new Tray(makeTrayIcon());
+    const appIcon = loadAppIcon();
+    const trayIcon = appIcon ? appIcon.resize({ width: 18, height: 18 }) : makeTrayIcon();
+    tray = new Tray(trayIcon);
     tray.setToolTip('WP MCP Manager');
     tray.setContextMenu(
       Menu.buildFromTemplate([
@@ -91,6 +110,9 @@ const scheduler: IntervalScheduler = {
 };
 
 void app.whenReady().then(() => {
+  const appIcon = loadAppIcon();
+  if (appIcon && process.platform === 'darwin' && app.dock) app.dock.setIcon(appIcon);
+
   const win = createWindow();
   mainWindow = win;
 
