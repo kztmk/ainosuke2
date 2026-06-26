@@ -3,3 +3,10 @@ dist/
 out/
 .DS_Store
 *.log
+
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+# Extensions: 秘密パラメータ（Stripe API キー等）はローカルのみ。非秘密の *.env はコミット可。
+extensions/*.secret.local
