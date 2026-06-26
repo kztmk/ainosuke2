@@ -19,10 +19,11 @@ function SummaryCard({ label, value, sub }: { label: string; value: string; sub?
 }
 
 export function SiteDetail({ site, onEdit }: { site: Site; onEdit: () => void }): JSX.Element {
-  const { syncSite, toggleConnection, removeSite, openExternal } = useApp();
+  const { syncSite, toggleConnection, removeSite, openExternal, warningsFor } = useApp();
   const { t } = useTranslation();
   const [syncing, setSyncing] = useState(false);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const siteWarnings = warningsFor(site.id);
 
   async function onSync(): Promise<void> {
     setSyncing(true);
@@ -59,6 +60,19 @@ export function SiteDetail({ site, onEdit }: { site: Site; onEdit: () => void })
           <Button onClick={() => openExternal(`${site.url}/wp-admin/`)}>{t('detail.browserLogin')}</Button>
         </div>
       </div>
+
+      {siteWarnings.length > 0 && (
+        <div className="mb-4 space-y-1">
+          {siteWarnings.map((w) => (
+            <div
+              key={w}
+              className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-300"
+            >
+              {w === 'long_connection' ? t('warnings.longConnection') : t('warnings.rotationDue')}
+            </div>
+          ))}
+        </div>
+      )}
 
       <section className="mb-4">
         <h3 className="mb-2 text-xs font-medium text-zinc-500">{t('detail.siteInfo')}</h3>

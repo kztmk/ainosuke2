@@ -59,6 +59,21 @@ export type ConnectionState = 'saved' | 'connected_pending_restart' | 'connected
 /** 疎通バッジ次元（§5.1.2 緑/黄/赤）。 */
 export type HealthStatus = 'ok' | 'unverified' | 'error';
 
+/** アプリパスワードの再発行を促す日数（§7・未決#2）。 */
+export const ROTATION_WARNING_DAYS = 90;
+
+/**
+ * サイトに対する注意喚起（§5.2.3 / §7）。
+ * - long_connection: 接続したまま閾値（既定 24h）超過。露出時間の自動監視（Pro）。
+ * - rotation_due: アプリパスワード発行から 90 日超過。セキュリティ衛生（Free）。
+ */
+export type WarningType = 'long_connection' | 'rotation_due';
+
+export interface SiteWarning {
+  siteId: string;
+  type: WarningType;
+}
+
 export interface SiteSummary {
   publishedCount: number | null;
   draftCount: number | null;

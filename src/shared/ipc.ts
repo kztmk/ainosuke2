@@ -14,6 +14,7 @@ import type {
   LogEntry,
   LogType,
   Site,
+  SiteWarning,
 } from './domain.js';
 
 /** サイト作成/編集の入力。認証情報（平文）は含めず secret.set で別途渡す。 */
@@ -134,6 +135,13 @@ export interface IpcApi {
 
   log: {
     list(filter?: LogFilter): Promise<LogEntry[]>;
+    /** CSV エクスポート（Pro・§12.1）。Free では null を返す。 */
+    exportCsv(filter?: LogFilter): Promise<string | null>;
+  };
+
+  /** サイトへの注意喚起（24h 接続継続〔Pro〕・90 日ローテーション〔Free〕）。 */
+  warnings: {
+    list(): Promise<SiteWarning[]>;
   };
 
   shell: {
@@ -177,6 +185,8 @@ export const IPC_INVOKE = {
   entitlementCan: 'entitlement:can',
   entitlementSiteLimit: 'entitlement:siteLimit',
   logList: 'log:list',
+  logExportCsv: 'log:exportCsv',
+  warningsList: 'warnings:list',
   shellOpenExternal: 'shell:openExternal',
 } as const;
 

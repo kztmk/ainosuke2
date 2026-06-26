@@ -39,6 +39,9 @@ export function registerHandlers(app: AppService): void {
   h(IPC_INVOKE.entitlementSiteLimit, () => app.entitlementSiteLimit());
 
   h(IPC_INVOKE.logList, (_e, filter?: LogFilter) => app.logList(filter));
+  h(IPC_INVOKE.logExportCsv, (_e, filter?: LogFilter) => app.exportLogsCsv(filter));
+
+  h(IPC_INVOKE.warningsList, () => app.getWarnings());
 
   h(IPC_INVOKE.shellOpenExternal, (_e, url: string) => app.shellOpenExternal(url));
 }

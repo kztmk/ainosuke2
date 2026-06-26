@@ -188,3 +188,20 @@ window.api = {
 3. ~~**mcp-wordpress-remote のピン留めバージョン**~~ **【確定】** 初期ピン = `@automattic/mcp-wordpress-remote@0.3.5`（現最新・ただし 0.x プレリリースのため M2/M3 で実機スモークテスト〔initialize・投稿 CRUD・公開・メディアアップロード〕を通してから配布版に固定）。**完全固定**で書く（`^`/`~` 禁止＝0.x はマイナーでも破壊的変更あり）。バージョンはアプリ設定で集中管理し、全 config 生成がそこを参照（将来の更新通知の単一真実源）。昇格スモークテストのチェックリストを運用し、既定ピン更新前に必ず通す。
 4. ~~**接続テストの MCP `initialize` 詳細**~~ **【確定】** MCP エンドポイントに直接 POST（プロキシ非経由）。ヘッダ `Content-Type: application/json` / `Accept: application/json, text/event-stream` / `Authorization: Basic base64(user:appパス)`。ボディは JSON-RPC 2.0 `initialize`（`protocolVersion`・空 `capabilities`・`clientInfo`）。応答は **JSON / SSE 両対応**でパースし `result.serverInfo.version` を「MCP アダプターバージョン」として表示。**initialize のみで使い捨て**（`notifications/initialized`・セッション維持は不要）。**版ネゴシエーション**（サーバー返却版を受容）＋版不一致時は1段古い既知版でフォールバック。protocolVersion の具体値・Basic 認証可否・SSE 返却有無は M2/M3 スモークで実機確認。
 5. **アイコン・署名情報** — Phase 4 配布の前提（Developer ID / Azure Artifact Signing）だが、ビルド設定の土台は M5 で用意。
+
+---
+
+## Phase 2（UX 向上）— 実装状況
+
+仕様 10章 Phase 2。Free/Pro 区分（自動監視・トレイ通知・24h 警告・CSV は Pro）を反映。
+
+- **warnings サービス（純関数・TDD 8件）** — 24h 接続継続（Pro）/ 90 日ローテーション（Free）の算出。Pro ゲートは AppService.getWarnings で適用（enforcement OFF の Phase 1〜2 は全取得）。
+- **statusMonitor（スケジューラ・TDD 5件）** — タイマー注入で start/stop/runNow。多重起動しない。
+- **AppService 拡張（統合テスト +6件）** — refreshAllStatuses（全サイト一括更新）/ refreshSite 共通化 / getWarnings / exportLogsCsv（Pro・null フォールバック）/ emitSiteStatus フック（connect・disconnect・sync・refresh で発火）。
+- **events 配線** — main が webContents.send(siteStatusChanged)、renderer が window.api.events で購読しサイドバー/詳細をリアルタイム差し替え。
+- **system tray（main/index）** — トレイ常駐・閉じても隠す（trayResident 連動）・アイコン資産なしでもクラッシュしない防御実装。起動時疎通＋バックグラウンド監視（Pro）を起動。
+- **renderer** — サイト警告バナー（詳細）/ ⚠ 表示（サイドバー）/ ログのフィルタ＋CSV エクスポート（Blob ダウンロード・Free は Pro 案内）。i18n 文字列追加。
+
+**検証: tsc 0・106 テスト緑・electron-vite build 成功。GUI 目視・トレイ動作はローカルの npm run dev で確認。**
+
+**Phase 2 残:** トレイのアイコン資産・エラー時のシステム通知（Notification）・接続継続/ローテーション警告のトレイ通知化・操作ログの長期保持（Pro）。

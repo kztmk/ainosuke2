@@ -12,7 +12,9 @@ import {
   type Site,
   type SiteRecord,
   type SiteSummary,
+  type SiteWarning,
 } from '../../shared/domain.js';
+import { computeWarnings } from '../services/warnings/warnings.js';
 import type {
   ConnectResult,
   LogFilter,
@@ -48,6 +50,8 @@ export interface AppServiceDeps {
   logger: Logger;
   settings: SettingsStore;
   openExternal: (url: string) => Promise<void>;
+  /** ステータス更新を renderer へプッシュする（§5.3.2 リアルタイム表示）。 */
+  emitSiteStatus?: (site: Site) => void;
   now?: () => Date;
 }
 
@@ -181,6 +185,7 @@ export class AppService {
     this.d.sites.setConnectionState(siteId, true, this.now().toISOString());
     this.pendingRestart.add(siteId);
     this.d.logger.record({ type: 'connect', siteId, result: 'ok' });
+    this.d.emitSiteStatus?.(this.assemble(this.d.sites.get(siteId)!));
     return { ok: true };
   }
 
@@ -193,6 +198,7 @@ export class AppService {
     this.d.sites.setConnectionState(siteId, false, null);
     this.pendingRestart.delete(siteId);
     this.d.logger.record({ type: 'disconnect', siteId, result: 'ok' });
+    this.d.emitSiteStatus?.(this.assemble(this.d.sites.get(siteId)!));
     return { ok: true };
   }
 
@@ -263,8 +269,24 @@ export class AppService {
   async syncRun(siteId: string): Promise<Site> {
     const site = this.d.sites.get(siteId);
     if (!site) throw new Error(`site not found: ${siteId}`);
+    const dto = await this.refreshSite(site);
+    this.d.logger.record({ type: 'sync', siteId, result: dto.health === 'error' ? 'error' : 'ok' });
+    return dto;
+  }
 
-    const sec = this.d.secrets.get(siteId);
+  /** 全サイトのステータスを再取得（§5.3.2 バックグラウンド疎通確認）。更新後の Site 一覧を返す。 */
+  async refreshAllStatuses(): Promise<Site[]> {
+    const records = this.d.sites.list();
+    const result: Site[] = [];
+    for (const record of records) {
+      result.push(await this.refreshSite(record));
+    }
+    return result;
+  }
+
+  /** REST＋MCP でサマリー/ステータスを更新し、Site DTO を返してプッシュ発火する（共通処理）。 */
+  private async refreshSite(site: SiteRecord): Promise<Site> {
+    const sec = this.d.secrets.get(site.id);
     const auth: BasicAuth | undefined =
       sec.status === 'ok' ? { username: site.username, applicationPassword: sec.password } : undefined;
 
@@ -281,7 +303,7 @@ export class AppService {
     }
 
     const health: HealthStatus = !auth ? 'unverified' : reachable ? 'ok' : 'error';
-    this.runtime.set(siteId, {
+    this.runtime.set(site.id, {
       health,
       summary: {
         publishedCount: summary.publishedCount,
@@ -290,8 +312,16 @@ export class AppService {
         mcpEndpointReachable: reachable,
       },
     });
-    this.d.logger.record({ type: 'sync', siteId, result: health === 'error' ? 'error' : 'ok' });
-    return this.assemble(this.d.sites.get(siteId)!);
+    const dto = this.assemble(this.d.sites.get(site.id)!);
+    this.d.emitSiteStatus?.(dto);
+    return dto;
+  }
+
+  /** 注意喚起（§5.2.3 / §7）。24h 接続継続は Pro、90 日ローテーションは Free。 */
+  getWarnings(): SiteWarning[] {
+    const all = computeWarnings(this.d.sites.list(), this.d.settings.read(), this.now());
+    const canLongConnection = this.d.entitlement.can('warn.connection24h');
+    return all.filter((w) => (w.type === 'long_connection' ? canLongConnection : true));
   }
 
   // --- claude --------------------------------------------------------------
@@ -338,6 +368,17 @@ export class AppService {
 
   logList(filter?: LogFilter): ReturnType<Logger['list']> {
     return this.d.logger.list(filter);
+  }
+
+  /** CSV エクスポート（Pro・§12.1）。Free では null を返す。 */
+  exportLogsCsv(filter?: LogFilter): string | null {
+    if (!this.d.entitlement.can('log.csvExport')) return null;
+    const header = ['at', 'type', 'siteId', 'result', 'message'];
+    const escape = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    const rows = this.d.logger.list(filter).map((e) =>
+      [e.at, e.type, e.siteId ?? '', e.result ?? '', e.message ?? ''].map((v) => escape(String(v))).join(','),
+    );
+    return [header.join(','), ...rows].join('\n');
   }
 
   async shellOpenExternal(url: string): Promise<void> {

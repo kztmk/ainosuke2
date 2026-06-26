@@ -14,7 +14,7 @@ const dot: Record<HealthStatus, string> = {
 };
 
 export function Sidebar({ onAdd }: { onAdd: () => void }): JSX.Element {
-  const { sites, selectedId, selectSite, setView, view, reorder } = useApp();
+  const { sites, selectedId, selectSite, setView, view, reorder, warningsFor } = useApp();
   const { t } = useTranslation();
   const [dragId, setDragId] = useState<string | null>(null);
 
@@ -57,6 +57,7 @@ export function Sidebar({ onAdd }: { onAdd: () => void }): JSX.Element {
             >
               <span className={dot[s.health]}>●</span>
               <span className="flex-1 truncate">{s.name}</span>
+              {warningsFor(s.id).length > 0 && <span title={t('warnings.badge')}>⚠</span>}
               {s.enabled && <span className="text-[10px] text-green-600 dark:text-green-400">{t('sidebar.connected')}</span>}
             </li>
           ))}

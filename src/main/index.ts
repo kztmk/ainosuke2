@@ -1,16 +1,22 @@
 /**
- * main エントリ — Electron アプリのライフサイクルと BrowserWindow。
+ * main エントリ — Electron アプリのライフサイクル・BrowserWindow・バックグラウンド監視・トレイ。
  * セキュリティ: contextIsolation 有効・nodeIntegration 無効（§7）。
  */
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, Menu, nativeImage, Tray } from 'electron';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { buildAppService } from './realDeps.js';
 import { registerHandlers } from './ipc/registerHandlers.js';
+import { StatusMonitor, type IntervalScheduler } from './services/statusMonitor/statusMonitor.js';
+import { IPC_EVENT } from '../shared/ipc.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-function createWindow(): void {
+let mainWindow: BrowserWindow | null = null;
+let tray: Tray | null = null;
+let isQuitting = false;
+
+function createWindow(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1024,
     height: 720,
@@ -25,25 +31,103 @@ function createWindow(): void {
     },
   });
 
-  // electron-vite: dev では Vite dev server、本番では out/renderer の index.html を読む
   if (process.env['ELECTRON_RENDERER_URL']) {
     void win.loadURL(process.env['ELECTRON_RENDERER_URL']);
   } else {
     void win.loadFile(path.join(__dirname, '../renderer/index.html'));
   }
+  return win;
 }
 
+/** 外部資産なしでトレイ用の塗りつぶし円アイコンを生成（macOS テンプレート画像＝明暗に追従）。 */
+function makeTrayIcon(): Electron.NativeImage {
+  const size = 22;
+  const buf = Buffer.alloc(size * size * 4);
+  const center = (size - 1) / 2;
+  const radius = size / 2 - 2;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = (y * size + x) * 4;
+      const inside = (x - center) ** 2 + (y - center) ** 2 <= radius ** 2;
+      // BGRA。黒で塗り、内側のみ不透明にする。
+      buf[i] = 0;
+      buf[i + 1] = 0;
+      buf[i + 2] = 0;
+      buf[i + 3] = inside ? 255 : 0;
+    }
+  }
+  const img = nativeImage.createFromBitmap(buf, { width: size, height: size });
+  img.setTemplateImage(true);
+  return img;
+}
+
+/** §5.4.1 システムトレイ常駐。アイコン生成に失敗してもクラッシュさせない。 */
+function setupTray(win: BrowserWindow): void {
+  try {
+    tray = new Tray(makeTrayIcon());
+    tray.setToolTip('WP MCP Manager');
+    tray.setContextMenu(
+      Menu.buildFromTemplate([
+        { label: 'ウィンドウを表示', click: () => win.show() },
+        { type: 'separator' },
+        {
+          label: '終了',
+          click: () => {
+            isQuitting = true;
+            app.quit();
+          },
+        },
+      ]),
+    );
+    tray.on('click', () => win.show());
+  } catch {
+    tray = null;
+  }
+}
+
+const scheduler: IntervalScheduler = {
+  set: (handler, ms) => setInterval(handler, ms),
+  clear: (handle) => clearInterval(handle as NodeJS.Timeout),
+};
+
 void app.whenReady().then(() => {
-  const appService = buildAppService();
+  const win = createWindow();
+  mainWindow = win;
+
+  const appService = buildAppService((site) => {
+    if (!win.isDestroyed()) win.webContents.send(IPC_EVENT.siteStatusChanged, site);
+  });
   registerHandlers(appService);
-  createWindow();
+  setupTray(win);
+
+  // §5.3.2 / §5.4.1 起動時の疎通確認＋バックグラウンド監視（自動監視は Pro）
+  const settings = appService.settingsGet();
+  const monitor = new StatusMonitor(async () => {
+    await appService.refreshAllStatuses();
+  }, scheduler);
+  if (settings.checkOnStartup) void monitor.runNow();
+  if (appService.entitlementCan('monitor.background')) {
+    monitor.start(Math.max(1, settings.pollIntervalMinutes) * 60_000);
+  }
+
+  // トレイ常駐時はウィンドウを閉じても隠すだけにする（§5.4.1）
+  win.on('close', (e) => {
+    if (!isQuitting && tray && appService.settingsGet().trayResident) {
+      e.preventDefault();
+      win.hide();
+    }
+  });
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow();
+    if (BrowserWindow.getAllWindows().length === 0) mainWindow = createWindow();
+    else win.show();
   });
 });
 
+app.on('before-quit', () => {
+  isQuitting = true;
+});
+
 app.on('window-all-closed', () => {
-  // §5.4.1 トレイ常駐は将来。現状は macOS 慣習に従い、それ以外は終了。
   if (process.platform !== 'darwin') app.quit();
 });

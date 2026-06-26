@@ -54,6 +54,10 @@ const api: IpcApi = {
   },
   log: {
     list: (filter) => ipcRenderer.invoke(IPC_INVOKE.logList, filter),
+    exportCsv: (filter) => ipcRenderer.invoke(IPC_INVOKE.logExportCsv, filter),
+  },
+  warnings: {
+    list: () => ipcRenderer.invoke(IPC_INVOKE.warningsList),
   },
   shell: {
     openExternal: (url) => ipcRenderer.invoke(IPC_INVOKE.shellOpenExternal, url),

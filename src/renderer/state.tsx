@@ -2,7 +2,7 @@
  * renderer のアプリ状態。window.api（IPC）越しに main の AppService を呼び、UI 状態を保持する。
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import type { AppSettings, Site, ThemePref } from '../shared/domain.js';
+import type { AppSettings, Site, SiteWarning, ThemePref, WarningType } from '../shared/domain.js';
 import type { SiteInput, TestResult } from '../shared/ipc.js';
 import i18n from './i18n/index.js';
 
@@ -32,6 +32,9 @@ interface AppState {
 
   /** 重要なエラー（接続失敗等）をモーダルで提示する。 */
   alert: string | null;
+
+  warnings: SiteWarning[];
+  warningsFor: (siteId: string) => WarningType[];
 
   selected: Site | null;
   setView: (v: View) => void;
@@ -69,20 +72,25 @@ export function AppStateProvider({ children }: { children: ReactNode }): JSX.Ele
   const [configPath, setConfigPath] = useState('');
   const [toast, setToast] = useState<Toast | null>(null);
   const [alert, setAlert] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<SiteWarning[]>([]);
 
   const reload = useCallback(async () => {
-    setSites(await window.api.sites.list());
+    const [list, w] = await Promise.all([window.api.sites.list(), window.api.warnings.list()]);
+    setSites(list);
+    setWarnings(w);
   }, []);
 
   useEffect(() => {
     void (async () => {
-      const [list, s, detected, cfg] = await Promise.all([
+      const [list, w, s, detected, cfg] = await Promise.all([
         window.api.sites.list(),
+        window.api.warnings.list(),
         window.api.settings.get(),
         window.api.claude.detect(),
         window.api.claude.configPath(),
       ]);
       setSites(list);
+      setWarnings(w);
       setSettings(s);
       setClaudeDetected(detected);
       setConfigPath(cfg);
@@ -90,6 +98,19 @@ export function AppStateProvider({ children }: { children: ReactNode }): JSX.Ele
       if (list.length > 0) setSelectedId((prev) => prev ?? list[0]!.id);
     })();
   }, []);
+
+  // main からのステータスプッシュで該当サイトを差し替える（§5.3.2 リアルタイム表示）
+  useEffect(() => {
+    const unsub = window.api.events.onSiteStatusChanged((site) => {
+      setSites((prev) => prev.map((s) => (s.id === site.id ? site : s)));
+    });
+    return unsub;
+  }, []);
+
+  const warningsFor = useCallback(
+    (siteId: string) => warnings.filter((w) => w.siteId === siteId).map((w) => w.type),
+    [warnings],
+  );
 
   const selected = useMemo(
     () => sites.find((s) => s.id === selectedId) ?? null,
@@ -206,6 +227,8 @@ export function AppStateProvider({ children }: { children: ReactNode }): JSX.Ele
     configPath,
     toast,
     alert,
+    warnings,
+    warningsFor,
     selected,
     setView,
     selectSite: setSelectedId,

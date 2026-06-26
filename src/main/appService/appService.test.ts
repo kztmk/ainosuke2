@@ -104,6 +104,8 @@ interface Harness {
   safe: FakeSafe;
   settings: MemorySettings;
   procCalls: string[];
+  emit: ReturnType<typeof vi.fn>;
+  setNow: (d: Date) => void;
 }
 
 let dir: string;
@@ -112,11 +114,13 @@ async function makeApp(fetchFn: FetchLike = routerFetch()): Promise<Harness> {
   dir = await fs.mkdtemp(path.join(os.tmpdir(), 'wpmcp-app-'));
   const configPath = path.join(dir, 'claude_desktop_config.json');
   let idSeq = 0;
-  const clock = () => new Date('2026-06-25T00:00:00Z');
+  let now = new Date('2026-06-25T00:00:00Z');
+  const clock = () => now;
 
   const safe = new FakeSafe();
   const settings = new MemorySettings();
   const procCalls: string[] = [];
+  const emit = vi.fn();
 
   const app = new AppService({
     sites: new SiteStore(new MemoryBackend(), () => `id-${++idSeq}`, clock),
@@ -142,10 +146,11 @@ async function makeApp(fetchFn: FetchLike = routerFetch()): Promise<Harness> {
     logger: new Logger(new MemoryLogStore(), clock),
     settings,
     openExternal: vi.fn(async () => {}),
+    emitSiteStatus: emit,
     now: clock,
   });
 
-  return { app, configPath, safe, settings, procCalls };
+  return { app, configPath, safe, settings, procCalls, emit, setNow: (d) => (now = d) };
 }
 
 const INPUT: SiteInput = {
@@ -333,6 +338,81 @@ describe('test / sync: サマリーとステータスを反映', () => {
       mcpEndpointReachable: true,
     });
     expect(site.health).toBe('ok');
+  });
+});
+
+describe('Phase 2: 全サイト更新・ステータスイベント', () => {
+  it('refreshAllStatuses が全サイトを更新し、サイトごとに emit する', async () => {
+    const { app, emit } = await makeApp();
+    const a = app.sitesCreate({ ...INPUT, name: 'A' });
+    const b = app.sitesCreate({ ...INPUT, name: 'B' });
+    if (!a.ok || !b.ok) return;
+    app.secretSet(a.site.id, 'pw');
+    app.secretSet(b.site.id, 'pw');
+    emit.mockClear();
+
+    const updated = await app.refreshAllStatuses();
+    expect(updated).toHaveLength(2);
+    expect(updated.every((s) => s.health === 'ok')).toBe(true);
+    expect(emit).toHaveBeenCalledTimes(2);
+  });
+
+  it('接続・同期でも emit される', async () => {
+    const { app, emit } = await makeApp();
+    const c = app.sitesCreate(INPUT);
+    if (!c.ok) return;
+    app.secretSet(c.site.id, 'pw');
+    emit.mockClear();
+
+    await app.connectionOn(c.site.id);
+    await app.syncRun(c.site.id);
+    expect(emit.mock.calls.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe('Phase 2: 警告と CSV', () => {
+  it('90 日超のローテーション警告を返す（Free）', async () => {
+    const { app, setNow } = await makeApp();
+    const c = app.sitesCreate(INPUT);
+    if (!c.ok) return;
+    app.secretSet(c.site.id, 'pw'); // secretUpdatedAt = 2026-06-25
+    setNow(new Date('2026-10-01T00:00:00Z')); // 98 日後
+
+    const w = app.getWarnings();
+    expect(w).toContainEqual({ siteId: c.site.id, type: 'rotation_due' });
+  });
+
+  it('enforcement OFF では 24h 接続継続警告も得られる', async () => {
+    const { app, setNow } = await makeApp();
+    const c = app.sitesCreate(INPUT);
+    if (!c.ok) return;
+    app.secretSet(c.site.id, 'pw');
+    await app.connectionOn(c.site.id); // connectedAt = 2026-06-25
+    setNow(new Date('2026-06-27T00:00:00Z')); // 48h 後
+
+    const w = app.getWarnings();
+    expect(w.some((x) => x.type === 'long_connection')).toBe(true);
+  });
+
+  it('exportLogsCsv はヘッダ付き CSV を返す（enforcement OFF＝Pro 相当）', async () => {
+    const { app } = await makeApp();
+    const c = app.sitesCreate(INPUT);
+    if (!c.ok) return;
+
+    const csv = app.exportLogsCsv();
+    expect(csv).not.toBeNull();
+    expect(csv!.split('\n')[0]).toBe('at,type,siteId,result,message');
+    expect(csv).toContain('site.add');
+  });
+
+  it('enforcement ON + Free では CSV エクスポートは null', async () => {
+    const { app } = await makeApp();
+    // Free で強制 ON にすると Pro 機能はブロックされる
+    (app as unknown as { d: { entitlement: EntitlementService } }).d.entitlement.setState({
+      tier: 'free',
+      enforcementEnabled: true,
+    });
+    expect(app.exportLogsCsv()).toBeNull();
   });
 });
 

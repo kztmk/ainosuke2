@@ -18,7 +18,7 @@ import { McpClient } from './services/mcpClient/mcpClient.js';
 import { EntitlementService } from './services/entitlement/entitlement.js';
 import { ClaudeDesktopService, type ProcessController } from './services/claudeDesktop/claudeDesktop.js';
 import { Logger, type LogStore } from './services/logger/logger.js';
-import { DEFAULT_SETTINGS, type AppSettings, type LogEntry, type SiteRecord } from '../shared/domain.js';
+import { DEFAULT_SETTINGS, type AppSettings, type LogEntry, type Site, type SiteRecord } from '../shared/domain.js';
 
 function makeProcessController(): ProcessController {
   const run = (cmd: string) =>
@@ -30,7 +30,7 @@ function makeProcessController(): ProcessController {
   };
 }
 
-export function buildAppService(): AppService {
+export function buildAppService(emitSiteStatus?: (site: Site) => void): AppService {
   const store = new Store();
 
   const siteBackend: SiteStoreBackend = {
@@ -73,5 +73,6 @@ export function buildAppService(): AppService {
     logger: new Logger(logBackend),
     settings,
     openExternal: (url) => shell.openExternal(url),
+    emitSiteStatus,
   });
 }

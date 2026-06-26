@@ -119,6 +119,15 @@ export const ja = {
     colDate: '日時',
     colType: '種別',
     colResult: '結果',
+    filterAll: 'すべての種別',
+    exportCsv: 'CSV エクスポート',
+    exportProOnly: 'CSV エクスポートは Pro 機能です。',
+  },
+  warnings: {
+    badge: '⚠ 注意',
+    longConnection: '接続したまま長時間経過しています。使用が完了していれば接続解除を推奨します。',
+    rotationDue:
+      'アプリケーションパスワードの発行から 90 日以上経過しています。再発行（ローテーション）を推奨します。',
   },
   alert: {
     title: 'エラー',
