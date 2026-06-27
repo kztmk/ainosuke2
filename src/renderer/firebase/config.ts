@@ -1,18 +1,21 @@
 /**
- * Firebase Web アプリ構成（dev）。
+ * Firebase Web アプリ構成。
  *
- * apiKey は Firebase では公開前提の識別子（秘密鍵ではない）なのでアプリ同梱でよい。
- * prod 配布時は本番プロジェクト（mcp-switchpoint-wp-prod）の構成へ差し替える。
- * Functions は東京（自作 issueLicense と同一）に揃える。
+ * 値は `.env.dev` / `.env.prod`（gitignore）の VITE_FIREBASE_* から electron.vite.config.ts が
+ * ビルド時に `__FIREBASE_CONFIG__` として注入する。apiKey は Firebase では公開前提の識別子だが、
+ * GitHub Secret Scanning 回避と dev/prod 切替のためリポジトリには置かない（テンプレ=.env.example）。
+ * 保護は Firestore セキュリティルール＋（将来）App Check で担保する。
  */
-export const firebaseConfig = {
-  apiKey: '***REMOVED_FIREBASE_API_KEY***',
-  authDomain: 'mcp-switchpoint-wp-dev.firebaseapp.com',
-  projectId: 'mcp-switchpoint-wp-dev',
-  storageBucket: 'mcp-switchpoint-wp-dev.firebasestorage.app',
-  messagingSenderId: '486215991318',
-  appId: '1:486215991318:web:6227e6f4005f8d8e997537',
-} as const;
+declare const __FIREBASE_CONFIG__: {
+  apiKey: string;
+  authDomain: string;
+  projectId: string;
+  storageBucket: string;
+  messagingSenderId: string;
+  appId: string;
+};
+
+export const firebaseConfig = __FIREBASE_CONFIG__;
 
 /** 自作 callable（issueLicense 等）と Stripe 拡張のリージョン。 */
 export const FUNCTIONS_REGION = 'asia-northeast1';

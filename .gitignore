@@ -13,3 +13,8 @@ extensions/*.secret.local
 
 # Google OAuth デスクトップクライアント（dev のローカル秘密。example のみコミット）
 google-oauth.local.json
+
+# Firebase Web 構成（dev/prod の実値。example のみコミット）
+.env
+.env.*
+!.env.example
