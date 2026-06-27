@@ -5,10 +5,15 @@
 import { ipcMain } from 'electron';
 import { IPC_INVOKE } from '../../shared/ipc.js';
 import type { AppService } from '../appService/appService.js';
-import type { LogFilter, SiteInput, TemplateInput, TestTarget } from '../../shared/ipc.js';
+import type { GoogleSignInResult, LogFilter, SiteInput, TemplateInput, TestTarget } from '../../shared/ipc.js';
 import type { AppSettings, Feature } from '../../shared/domain.js';
 
-export function registerHandlers(app: AppService): void {
+/** AppService に属さない main 固有のハンドラ（OAuth 等）。 */
+export interface ExtraHandlers {
+  googleSignIn(): Promise<GoogleSignInResult>;
+}
+
+export function registerHandlers(app: AppService, extra: ExtraHandlers): void {
   const h = ipcMain.handle.bind(ipcMain);
 
   h(IPC_INVOKE.sitesList, () => app.sitesList());
@@ -52,6 +57,8 @@ export function registerHandlers(app: AppService): void {
   h(IPC_INVOKE.licenseDeviceId, () => app.licenseDeviceId());
   h(IPC_INVOKE.licenseActivate, (_e, token: string) => app.licenseActivate(token));
   h(IPC_INVOKE.licenseDeactivate, () => app.licenseDeactivate());
+
+  h(IPC_INVOKE.authGoogleSignIn, () => extra.googleSignIn());
 
   h(IPC_INVOKE.shellOpenExternal, (_e, url: string) => app.shellOpenExternal(url));
 }

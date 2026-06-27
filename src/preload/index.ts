@@ -71,6 +71,9 @@ const api: IpcApi = {
     activate: (token) => ipcRenderer.invoke(IPC_INVOKE.licenseActivate, token),
     deactivate: () => ipcRenderer.invoke(IPC_INVOKE.licenseDeactivate),
   },
+  auth: {
+    googleSignIn: () => ipcRenderer.invoke(IPC_INVOKE.authGoogleSignIn),
+  },
   shell: {
     openExternal: (url) => ipcRenderer.invoke(IPC_INVOKE.shellOpenExternal, url),
   },

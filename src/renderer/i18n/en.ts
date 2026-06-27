@@ -162,7 +162,9 @@ export const en = {
     errSignIn: 'Sign-in required.',
     authError: 'Sign-in failed ({{code}}).',
     issueError: 'Failed to obtain license ({{message}}).',
-    googleSoon: '※ Google sign-in is coming soon.',
+    or: 'or',
+    googleSignIn: 'Sign in with Google',
+    googleError: 'Google sign-in failed ({{reason}}).',
     manualToggle: 'Enter a token manually',
   },
   settings: {

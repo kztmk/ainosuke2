@@ -2,12 +2,14 @@
  * main エントリ — Electron アプリのライフサイクル・BrowserWindow・バックグラウンド監視・トレイ。
  * セキュリティ: contextIsolation 有効・nodeIntegration 無効（§7）。
  */
-import { app, BrowserWindow, Menu, nativeImage, Tray } from 'electron';
+import { app, BrowserWindow, Menu, nativeImage, shell, Tray } from 'electron';
 import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { buildAppService } from './realDeps.js';
 import { registerHandlers } from './ipc/registerHandlers.js';
+import { signInWithGoogleLoopback } from './services/googleAuth/googleAuth.js';
+import { GOOGLE_OAUTH } from './googleOAuth.js';
 import { StatusMonitor, type IntervalScheduler } from './services/statusMonitor/statusMonitor.js';
 import { IPC_EVENT } from '../shared/ipc.js';
 
@@ -119,7 +121,14 @@ void app.whenReady().then(() => {
   const appService = buildAppService((site) => {
     if (!win.isDestroyed()) win.webContents.send(IPC_EVENT.siteStatusChanged, site);
   });
-  registerHandlers(appService);
+  registerHandlers(appService, {
+    googleSignIn: () =>
+      signInWithGoogleLoopback({
+        config: GOOGLE_OAUTH,
+        openExternal: (url) => shell.openExternal(url),
+        fetch: globalThis.fetch,
+      }),
+  });
   setupTray(win);
 
   // §5.3.2 / §5.4.1 起動時の疎通確認＋バックグラウンド監視（自動監視は Pro）

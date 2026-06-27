@@ -161,7 +161,9 @@ export const ja = {
     errSignIn: 'サインインが必要です。',
     authError: 'サインインに失敗しました（{{code}}）。',
     issueError: 'ライセンス取得に失敗しました（{{message}}）。',
-    googleSoon: '※ Google サインインは近日対応予定です。',
+    or: 'または',
+    googleSignIn: 'Google でサインイン',
+    googleError: 'Google サインインに失敗しました（{{reason}}）。',
     manualToggle: 'トークンを手動で入力する',
   },
   settings: {

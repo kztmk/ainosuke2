@@ -26,6 +26,15 @@ export type LicenseActivateResult =
   | { ok: true }
   | { ok: false; reason: 'malformed' | 'invalid_signature' | 'expired' };
 
+/** Google サインイン（main のループバック OAuth）の結果。idToken は renderer が signInWithCredential に使う。 */
+export type GoogleSignInResult =
+  | { ok: true; idToken: string }
+  | {
+      ok: false;
+      reason: 'not_configured' | 'cancelled' | 'state_mismatch' | 'token_exchange_failed' | 'no_id_token' | 'error';
+      message?: string;
+    };
+
 /** サイト作成/編集の入力。認証情報（平文）は含めず secret.set で別途渡す。 */
 export interface SiteInput {
   name: string;
@@ -174,6 +183,12 @@ export interface IpcApi {
     deactivate(): Promise<void>;
   };
 
+  /** アカウント認証（Pro ライセンスのアカウント連携・段階2）。 */
+  auth: {
+    /** Google サインイン: main がシステムブラウザでループバック OAuth を行い ID トークンを返す。 */
+    googleSignIn(): Promise<GoogleSignInResult>;
+  };
+
   shell: {
     /** OS 既定ブラウザで開く（§5.1.4）。 */
     openExternal(url: string): Promise<void>;
@@ -225,6 +240,7 @@ export const IPC_INVOKE = {
   licenseDeviceId: 'license:deviceId',
   licenseActivate: 'license:activate',
   licenseDeactivate: 'license:deactivate',
+  authGoogleSignIn: 'auth:googleSignIn',
   shellOpenExternal: 'shell:openExternal',
 } as const;
 

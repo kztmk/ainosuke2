@@ -15,6 +15,7 @@ import {
   onAuth,
   revokeDevice,
   signInEmail,
+  signInWithGoogleIdToken,
   signOutUser,
   signUpEmail,
   startCheckout,
@@ -143,6 +144,24 @@ export function LicenseAccount({
     }
   }
 
+  async function doGoogle(): Promise<void> {
+    setError(null);
+    setInfo(null);
+    setBusy(true);
+    try {
+      const r = await window.api.auth.googleSignIn();
+      if (!r.ok) {
+        setError(t('license.googleError', { reason: r.reason }));
+        return;
+      }
+      await signInWithGoogleIdToken(r.idToken);
+    } catch (e) {
+      setError(t('license.authError', { code: authErrorCode(e) }));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function doCheckout(priceId: string): Promise<void> {
     if (!user) return;
     setError(null);
@@ -204,7 +223,14 @@ export function LicenseAccount({
             {mode === 'signin' ? t('license.toSignUp') : t('license.toSignIn')}
           </Button>
         </div>
-        <p className="text-xs text-zinc-400">{t('license.googleSoon')}</p>
+        <div className="flex items-center gap-2 pt-1">
+          <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+          <span className="text-xs text-zinc-400">{t('license.or')}</span>
+          <span className="h-px flex-1 bg-zinc-200 dark:bg-zinc-800" />
+        </div>
+        <Button variant="default" onClick={() => void doGoogle()} disabled={busy} className="w-full">
+          {t('license.googleSignIn')}
+        </Button>
       </div>
     );
   }

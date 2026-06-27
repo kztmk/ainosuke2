@@ -11,7 +11,9 @@ import { initializeApp } from 'firebase/app';
 import {
   createUserWithEmailAndPassword,
   getAuth,
+  GoogleAuthProvider,
   onAuthStateChanged,
+  signInWithCredential,
   signInWithEmailAndPassword,
   signOut,
   type User,
@@ -41,6 +43,11 @@ export function signUpEmail(email: string, password: string): Promise<unknown> {
 
 export function signOutUser(): Promise<void> {
   return signOut(auth);
+}
+
+/** main のループバック OAuth で得た Google ID トークンで Firebase にサインインする（段階2）。 */
+export function signInWithGoogleIdToken(idToken: string): Promise<unknown> {
+  return signInWithCredential(auth, GoogleAuthProvider.credential(idToken));
 }
 
 /** Firebase Auth のエラーコードを返す（UI のローカライズ用）。 */
