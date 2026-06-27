@@ -1,7 +1,8 @@
 /** ライセンス（Pro）セクション（§12.2）。状態表示・アカウント連携・端末管理・手動トークン（フォールバック）。 */
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MAX_DEVICES, type LicenseStatus } from '../../shared/domain.js';
+import { LICENSE_CHANGED_EVENT } from '../firebase/licenseSync.js';
 import { formatDateTime } from '../i18n/index.js';
 import { LicenseAccount } from './LicenseAccount.js';
 import { Button, Card, Field, TextInput } from './ui.js';
@@ -13,15 +14,19 @@ export function LicenseSection(): JSX.Element {
   const [token, setToken] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  async function reload(): Promise<void> {
+  const reload = useCallback(async (): Promise<void> => {
     const [s, d] = await Promise.all([window.api.license.status(), window.api.license.deviceId()]);
     setStatus(s);
     setDeviceId(d);
-  }
+  }, []);
 
   useEffect(() => {
     void reload();
-  }, []);
+    // バックグラウンド自動更新が走ったら status を取り直す
+    const onChanged = (): void => void reload();
+    window.addEventListener(LICENSE_CHANGED_EVENT, onChanged);
+    return () => window.removeEventListener(LICENSE_CHANGED_EVENT, onChanged);
+  }, [reload]);
 
   async function onActivate(): Promise<void> {
     setError(null);

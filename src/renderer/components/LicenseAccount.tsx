@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next';
 import { BILLING_PLANS } from '../../shared/billing.js';
 import {
   authErrorCode,
+  deviceLabel,
   issueLicense,
   listDevices,
   onAuth,
@@ -24,11 +25,6 @@ import {
   type User,
 } from '../firebase/client.js';
 import { Button, Field, TextInput } from './ui.js';
-
-function deviceName(): string {
-  const platform = typeof navigator !== 'undefined' ? navigator.platform : '';
-  return platform ? `WP MCP Manager (${platform})` : 'WP MCP Manager';
-}
 
 /** callable のエラーメッセージ（HttpsError message）を i18n キーへ対応付ける。 */
 function callableErrorKey(message: string): string {
@@ -103,7 +99,7 @@ export function LicenseAccount({
     setInfo(null);
     setBusy(true);
     try {
-      const issued = await issueLicense(deviceId, deviceName());
+      const issued = await issueLicense(deviceId, deviceLabel());
       const res = await window.api.license.activate(issued.token);
       if (!res.ok) {
         setError(t('license.activateError', { reason: res.reason }));

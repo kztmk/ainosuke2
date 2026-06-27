@@ -33,6 +33,12 @@ export function onAuth(cb: (user: User | null) => void): () => void {
   return onAuthStateChanged(auth, cb);
 }
 
+/** issueLicense に渡す端末名（プラットフォーム付き）。 */
+export function deviceLabel(): string {
+  const platform = typeof navigator !== 'undefined' ? navigator.platform : '';
+  return platform ? `WP MCP Manager (${platform})` : 'WP MCP Manager';
+}
+
 export function signInEmail(email: string, password: string): Promise<unknown> {
   return signInWithEmailAndPassword(auth, email, password);
 }
