@@ -80,6 +80,37 @@ cd functions && npm install && cd ..
 firebase deploy --only functions,firestore:rules --project=mcp-switchpoint-wp-dev
 ```
 
+> `issueLicense` は Secret を使うため、対話で「Grant access to LICENSE_PRIVATE_KEY? (Y/n)」が出る。
+> 非対話（CI 等）では先に付与: `gcloud secrets add-iam-policy-binding LICENSE_PRIVATE_KEY
+> --member="serviceAccount:<PROJECT_NUMBER>-compute@developer.gserviceaccount.com"
+> --role="roles/secretmanager.secretAccessor" --project=...`
+
+### 6.5. 新規プロジェクトの IAM ハマりどころ（3点）
+2nd gen（Cloud Run）の callable は、新規プロジェクトだと以下が自動設定されず失敗することがある。
+PROJECT_NUMBER は `firebase projects:list` 等で確認（dev=486215991318）。
+
+1. **Artifact Registry 読み取り**（デプロイ 403: gcf-artifacts メタデータ）:
+   ```bash
+   gcloud projects add-iam-policy-binding <PROJECT_ID> \
+     --member="serviceAccount:<PROJECT_NUMBER>-compute@developer.gserviceaccount.com" \
+     --role="roles/artifactregistry.reader"
+   ```
+2. **Secret 読み取り**（issueLicense が LICENSE_PRIVATE_KEY を使う）:
+   ```bash
+   gcloud secrets add-iam-policy-binding LICENSE_PRIVATE_KEY \
+     --member="serviceAccount:<PROJECT_NUMBER>-compute@developer.gserviceaccount.com" \
+     --role="roles/secretmanager.secretAccessor" --project=<PROJECT_ID>
+   ```
+3. **callable の公開呼び出し許可**（呼び出しが Cloud Run 層で 403 / OPTIONS 失敗）:
+   ```bash
+   for SVC in issuelicense listdevices revokedevice; do
+     gcloud run services add-iam-policy-binding $SVC --region=asia-northeast1 \
+       --member=allUsers --role=roles/run.invoker --project=<PROJECT_ID>
+   done
+   ```
+   ※ allUsers は「入口到達」のみ許可。認証は関数内（Firebase Auth トークン検証）で行う＝callable の標準構成。
+   関数を作り直すと外れることがあるので、その場合は再付与する。
+
 ### 7. 動作確認（最小）
 1. テストユーザーでサインイン（Auth コンソールで手動作成可）。
 2. Stripe テストカード `4242 4242 4242 4242` で Checkout → サブスク active。
