@@ -101,10 +101,16 @@ v1 は P0〜P2＋P4＋P5＋P6 で「ログイン→下書き作成/更新/一覧
 - 実 note 検証：P1/P2 はあなたの実アカウントでの疎通往復が律速。
 
 ## 8. リスク・未決
+- **ログイン時の bot 検知/reCAPTCHA**（P1 で実地確認）: note は新規ログインに reCAPTCHA を出す。**ログインを繰り返すと一時ブロック**される（PoC で「毎回まっさら強制ログイン」をやり再現）。対策＝**(1) ログインは一度きり＋セッション永続化・再利用**（毎回ログインしない）、**(2) Electron トークンを外したクリーン Chrome UA**、(3) reCAPTCHA はユーザーが窓内で手動で1回解く（note-mcp も手動ログイン推奨）。それでも単発クリーンログインが恒常的に弾かれるなら D の再検討が要る（要継続検証）。
 - **最難所＝note 専用 HTML 忠実度**（崩れると記事が壊れる）。段階的・ゴールデン駆動で。
 - Claude Desktop の localhost HTTP MCP（bridge 経由）安定性は P5 で実機確認。
 - セッション失効頻度・再ログイン UX は実運用で調整。
 - **公開可否**（note-core を単体 MIT 公開するか）は P 完了後のプロダクト判断（非公式API の ToS 観点）。設計は公開可能な分離を先に確保。
+
+## P1 進捗メモ（2026-06-27）
+- ✅ API 契約確認: 認証＝**全 note Cookie を Cookie ヘッダ**（必須は `_note_session_v5`、変更系のみ `XSRF-TOKEN`）。認証判定＝`GET /api/v2/self` 200（`data.id`/`data.urlname`）。一覧＝`GET /api/v2/note_list/contents?page=1` → `{"data":{"notes":[...]}}`（空は totalCount 省略）。`_note_session_v5` は**匿名でもセットされる**ため Cookie 有無で認証判定してはいけない。
+- ⚠ 未達: **実ログインの疎通**（reCAPTCHA 連発→一時ブロックで中断）。PoC を v3（永続＋クリーンUA＝単発ログイン）に修正済み。**note のブロック解除後に1回ログイン**して `urlname` 表示＋list を確認すれば P1 完了。
+- PoC: `scratchpad/note-poc/main.cjs`（使い捨て）。
 
 ## 9. ライセンス
 - note-mcp は **MIT**。移植部分は note-mcp の著作権＋MIT 許諾を `NOTICE`/`THIRD-PARTY` に明記。
