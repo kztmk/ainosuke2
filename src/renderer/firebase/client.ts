@@ -120,6 +120,10 @@ export function startCheckout(uid: string, priceId: string): Promise<string> {
       price: priceId,
       success_url: CHECKOUT_RETURN_URL,
       cancel_url: CHECKOUT_RETURN_URL,
+      // ギフト用: プロモコード入力欄を表示。100%オフ等で総額$0なら payment_method_collection:
+      // 'if_required' によりカード入力不要（有料プランは総額>0なのでカード必須のまま）。
+      allow_promotion_codes: true,
+      payment_method_collection: 'if_required',
     })
       .then((ref) => {
         const unsub = onSnapshot(
