@@ -19,9 +19,6 @@ import type {
   SiteWarning,
 } from './domain.js';
 
-/** Stripe 決済ページ（Pro へのアップグレード導線・§12.2）。発行サーバー確定時に差し替える。 */
-export const CHECKOUT_URL = 'https://example.com/checkout';
-
 export type LicenseActivateResult =
   | { ok: true }
   | { ok: false; reason: 'malformed' | 'invalid_signature' | 'expired' };
