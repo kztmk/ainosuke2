@@ -9,7 +9,7 @@ import path from 'node:path';
 import { buildAppService } from './realDeps.js';
 import { registerHandlers } from './ipc/registerHandlers.js';
 import { signInWithGoogleLoopback } from './services/googleAuth/googleAuth.js';
-import { GOOGLE_OAUTH } from './googleOAuth.js';
+import { loadGoogleOAuth } from './googleOAuth.js';
 import { StatusMonitor, type IntervalScheduler } from './services/statusMonitor/statusMonitor.js';
 import { IPC_EVENT } from '../shared/ipc.js';
 
@@ -124,7 +124,7 @@ void app.whenReady().then(() => {
   registerHandlers(appService, {
     googleSignIn: () =>
       signInWithGoogleLoopback({
-        config: GOOGLE_OAUTH,
+        config: loadGoogleOAuth(),
         openExternal: (url) => shell.openExternal(url),
         fetch: globalThis.fetch,
       }),

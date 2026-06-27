@@ -10,3 +10,6 @@ firebase-debug.log
 firestore-debug.log
 # Extensions: 秘密パラメータ（Stripe API キー等）はローカルのみ。非秘密の *.env はコミット可。
 extensions/*.secret.local
+
+# Google OAuth デスクトップクライアント（dev のローカル秘密。example のみコミット）
+google-oauth.local.json
