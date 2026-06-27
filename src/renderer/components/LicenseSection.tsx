@@ -1,9 +1,9 @@
-/** ライセンス（Pro）セクション（§12.2）。状態表示・トークン貼り付けアクティベート・アップグレード導線。 */
+/** ライセンス（Pro）セクション（§12.2）。状態表示・アカウント連携・端末管理・手動トークン（フォールバック）。 */
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MAX_DEVICES, type LicenseStatus } from '../../shared/domain.js';
-import { CHECKOUT_URL } from '../../shared/ipc.js';
 import { formatDateTime } from '../i18n/index.js';
+import { LicenseAccount } from './LicenseAccount.js';
 import { Button, Card, Field, TextInput } from './ui.js';
 
 export function LicenseSection(): JSX.Element {
@@ -67,23 +67,29 @@ export function LicenseSection(): JSX.Element {
       <p className="break-all text-xs text-zinc-400">{t('license.deviceId', { id: deviceId })}</p>
       <p className="text-xs text-zinc-400">{t('license.deviceLimit', { max: MAX_DEVICES })}</p>
 
-      {status.activated ? (
+      {status.activated && (
         <Button variant="danger" onClick={() => void onDeactivate()}>
           {t('license.deactivate')}
         </Button>
-      ) : (
-        <>
-          <Button variant="primary" onClick={() => void window.api.shell.openExternal(CHECKOUT_URL)}>
-            {t('license.upgrade')}
-          </Button>
-          <Field label={t('license.tokenLabel')}>
-            <TextInput value={token} onChange={(e) => setToken(e.target.value)} placeholder={t('license.tokenPlaceholder')} />
-          </Field>
-          {error && <p className="text-xs text-red-500">{error}</p>}
-          <Button onClick={() => void onActivate()} disabled={token.trim().length === 0}>
-            {t('license.activate')}
-          </Button>
-        </>
+      )}
+
+      {/* アカウント連携（サインイン → 決済 → 自動有効化 → 端末管理） */}
+      <LicenseAccount isPro={isPro} deviceId={deviceId} onActivated={reload} />
+
+      {/* フォールバック: 手動トークン投入 */}
+      {!isPro && (
+        <details className="border-t border-zinc-100 pt-2 dark:border-zinc-800">
+          <summary className="cursor-pointer text-xs text-zinc-500">{t('license.manualToggle')}</summary>
+          <div className="mt-2 space-y-2">
+            <Field label={t('license.tokenLabel')}>
+              <TextInput value={token} onChange={(e) => setToken(e.target.value)} placeholder={t('license.tokenPlaceholder')} />
+            </Field>
+            {error && <p className="text-xs text-red-500">{error}</p>}
+            <Button onClick={() => void onActivate()} disabled={token.trim().length === 0}>
+              {t('license.activate')}
+            </Button>
+          </div>
+        </details>
       )}
     </Card>
   );
