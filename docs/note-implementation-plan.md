@@ -54,6 +54,8 @@ type PostTarget = WordPressTarget | NoteTarget;
 
 影響：`siteStore`（→ targetStore へ一般化 or 内部分岐）、`configWriter`（note は bridge エントリを書く分岐）、IPC 型、renderer（投稿先タイプ選択・一覧表示）。**既存 WordPress 挙動は不変**を回帰テストで担保。
 
+**P0 の実装方針（2026-07-02・土台完了）**: 全面 rename ではなく**加法的**に土台を敷いた。`src/shared/domain.ts` に `Platform`/`NoteLoginState`/`PostTargetBase`/`WordPressTarget`(=`Site & {platform:'wordpress'}` でロスレス)/`NoteTarget`/`PostTarget` union を追加。判別ロジックは `src/shared/postTarget.ts`（`isWordPressTarget`/`isNoteTarget`/`siteToWordPressTarget`/`wordPressTargetToSite`・ユニット5件）。**既存 `Site`/`SiteRecord`・siteStore・renderer・IPC は無変更**＝回帰ゼロ（全145件グリーン）。store/configWriter/UI の union 採用は note 機能が実際に UI/config に出る **P5/P6** で段階適用する（今やると WordPress 動作を広範に触るため）。
+
 ## 4. コンポーネント詳細
 
 ### 4.1 note-core（独立）
@@ -85,7 +87,7 @@ type PostTarget = WordPressTarget | NoteTarget;
 
 | Ph | 目的 | 主タスク | 目安 |
 |----|------|---------|------|
-| P0 | ドメイン一般化 | PostTarget 型・store/configWriter 分岐・既存WP回帰 | 1〜2 |
+| P0 | ドメイン一般化 | ✅**土台完了(2026-07-02)** PostTarget union＋型ガード＋アダプタ。store/configWriter 分岐は note 着地(P5/P6)時に適用。 | 土台済 |
 | P1 | ログイン疎通 | ✅**完了(2026-07-02)** BrowserWindow ログイン→永続セッション→`list_articles` 実機確認。認証判定は `/settings/account` ページ読み取り。 | 完了 |
 | P2 | 中核CRUD | create/update/get/list/publish/delete_draft | 2〜3 |
 | P3 | 本文HTML忠実度 | markdown→note HTML（＋get用 逆変換） | 2〜3（最難所） |

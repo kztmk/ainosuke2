@@ -112,6 +112,54 @@ export interface Site extends SiteRecord {
   summary: SiteSummary | null;
 }
 
+// ───────────────────────────────────────────────────────────────────────────
+// 投稿先（プラットフォーム非依存の上位概念・CONTEXT.md / ADR-0008）
+// WordPress の「サイト」と note の「note アカウント」を包含する discriminated union。
+// P0 の土台: 既存 WordPress（Site/SiteRecord）は不変のまま、platform 判別で union へ組み込む。
+// ───────────────────────────────────────────────────────────────────────────
+
+/** 投稿先のプラットフォーム種別。プラットフォームごとに認証・接続の仕組みが異なる。 */
+export type Platform = 'wordpress' | 'note';
+
+/**
+ * note のログイン軸（接続=config 軸とは独立・CONTEXT.md）。
+ * - logged_in: アプリが有効な note セッションを保持
+ * - needs_relogin: セッション失効/未取得（接続中でも Claude から叩くと失敗）
+ */
+export type NoteLoginState = 'logged_in' | 'needs_relogin';
+
+/** すべての投稿先が共有する基底フィールド（platform で判別）。 */
+export interface PostTargetBase {
+  id: string;
+  name: string;
+  platform: Platform;
+  order: number;
+  enabled: boolean;
+  connectedAt: string | null;
+  createdAt: string;
+  memo: string;
+}
+
+/**
+ * WordPress 投稿先。既存の Site DTO に platform 判別子を付けたもの（ロスレス）。
+ * Site は PostTargetBase の全フィールドを構造的に満たす。
+ */
+export type WordPressTarget = Site & { platform: 'wordpress' };
+
+/** note 投稿先（DTO）。認証情報は持たず、ログイン状態と最後に確認した note ID を持つ。 */
+export interface NoteTarget extends PostTargetBase {
+  platform: 'note';
+  /** note ID（urlname・例: bungo_ai_nosuke）。/settings/account 読み取りで確定した最後の値。 */
+  urlname: string | null;
+  /** note 内部ユーザー ID（数値文字列）。 */
+  noteUserId: string | null;
+  /** ログイン軸の状態（接続とは独立）。 */
+  loginState: NoteLoginState;
+}
+
+/** 投稿先（プラットフォーム横断の union）。UI 一覧・configWriter の分岐はこれを消費する。 */
+export type PostTarget = WordPressTarget | NoteTarget;
+
 /** Pro ライセンスの同時利用台数上限（§12.2・サーバー側で発行時に強制）。 */
 export const MAX_DEVICES = 3;
 /** オフライン猶予日数（§12.2：再検証できない間も動作継続する期間）。 */
