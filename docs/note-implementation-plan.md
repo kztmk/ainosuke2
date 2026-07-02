@@ -90,7 +90,7 @@ type PostTarget = WordPressTarget | NoteTarget;
 | P0 | ドメイン一般化 | ✅**土台完了(2026-07-02)** PostTarget union＋型ガード＋アダプタ。store/configWriter 分岐は note 着地(P5/P6)時に適用。 | 土台済 |
 | P1 | ログイン疎通 | ✅**完了(2026-07-02)** BrowserWindow ログイン→永続セッション→`list_articles` 実機確認。認証判定は `/settings/account` ページ読み取り。 | 完了 |
 | P2 | 中核CRUD | ✅**実装完了(2026-07-02)** create/update/get/publish/delete_draft を note-core に追加（本文はHTML直接・埋込/画像はv2）。ユニット29件。実note疎通は要ログイン時に。 | 実装済 |
-| P3 | 本文HTML忠実度 | ✅**前方変換 完了(2026-07-02)** markdown→note HTML（markdown-it＋note固有変換）。逆変換(html→markdown)と exotic記法は残。 | 前方済 |
+| P3 | 本文HTML忠実度 | ✅**双方向 完了(2026-07-02)** markdown⇄note HTML（markdown-it＋note固有変換／逆変換は往復一致）。exotic記法(TOC/整列/株式/埋込)は残。 | 双方向済 |
 | P4 | アイキャッチ | upload_eyecatch（presigned） | 1 |
 | P5 | 常駐ホスト＋ブリッジ＋config | host.ts / note-bridge.mjs / configWriter / Claude 実機疎通 | 2 |
 | P6 | UI/状態/同意＋テスト | プラットフォーム選択・要再ログイン表示・同意・Pro gating・テスト | 2〜3 |
@@ -146,8 +146,13 @@ v1 は P0〜P2＋P4＋P5＋P6 で「ログイン→下書き作成/更新/一覧
 - CommonMark ベースは **markdown-it 14**（`new MarkdownIt('commonmark').enable('strikethrough')`＝note-mcp と同条件）。note-core に依存追加（install は `--ignore-scripts`＝electron postinstall を触らない・[[electron-binary-install-workaround]]）。
 - note 固有変換（note-mcp `markdown_to_html.py` 準拠）: 画像→figure(620x457)、`<li>`→`<li><p>…</p></li>`、blockquote 内改行→`<br>`、**全要素に name/id(UUID) 付与**（`<li>`/`<blockquote>` は除外）、blockquote→figure＋**引用元(— 著者/URL)を figcaption 抽出**、code block→`<pre class="codeBlock">`（language クラス除去・pre 内改行保持・他は改行除去）。
 - **UUID は生成器注入**（既定 `crypto.randomUUID`、テストは決定的カウンタ）＝出力を安定化。
-- **残タスク（段階的忠実度）**: ①**逆変換 html→note markdown**（get_article 用・移植元 `html_to_markdown.py` 477行）②exotic 記法: `[TOC]`・テキスト整列(`->center<-`)・株式記法(`^1234`/`$AAPL`)・単独URL埋め込み(v2)。現状これらは素通り。
-- note-core CRUD は引き続き `bodyHtml` を入出力。**markdown→HTML は tools 層(P5)が本変換を挟む**（Claude からの markdown を `markdownToNoteHtml` → `createDraft`）。
+### 逆変換（2026-07-02・完了）
+`packages/note-core/src/markdown/fromNoteHtml.ts` = `noteHtmlToMarkdown(html)`（`html_to_markdown.py` 準拠・正規表現ベース・**テスト20件**）。見出し/段落/インライン(太字/斜体/打消/コード/リンク)/リスト(ネスト対応・独自タグマッチング)/blockquote figure＋引用元復元/画像 figure/コードブロック(フェンス化)/HR/TOC/テキスト整列/実体復号。
+- **往復一致を確認**（markdown→html→markdown が主要ケースで完全一致）。
+- note-mcp 由来のバグを2点修正（本移植では改善）: ①inline `<code>` と code block の `<code>` を**属性許容**にして name/id 付き code を拾う ②**コードブロック復元を「全タグ除去・実体復号の後」に移動**（code 内の `<tag>` が消える／二重復号する不具合を回避）。
+- **残（段階的忠実度）**: exotic 記法の**前方**未対応（`[TOC]`・整列 `->center<-`・株式 `^1234`/`$AAPL`・単独URL埋め込み(v2)）。逆方向は TOC/整列を復元可。
+
+note-core CRUD は引き続き `bodyHtml` を入出力。**markdown⇄HTML は tools 層(P5)が挟む**（Claude の md を `markdownToNoteHtml`→`createDraft`／`getArticle` の `bodyHtml` を `noteHtmlToMarkdown`→Claude へ）。
 
 ## 9. ライセンス
 - note-mcp は **MIT**。移植部分は note-mcp の著作権＋MIT 許諾を `NOTICE`/`THIRD-PARTY` に明記。
