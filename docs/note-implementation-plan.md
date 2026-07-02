@@ -122,6 +122,12 @@ v1 は P0〜P2＋P4＋P5＋P6 で「ログイン→下書き作成/更新/一覧
 - セッション供給は「アプリがログイン UI（`/settings/account` 読み取り）で **ログイン状態＋urlname** を確定 → 全 Cookie を note-core に注入」。note-core は**渡された Cookie で API を叩くだけ**（認証判定ロジックは持たない）。`getSelf()` はアプリ側のページ読み取り結果（urlname/id）を保持する形にする。
 - 参照実装 `scratchpad/note-mcp-src`（`git clone --depth 1` で再取得可、MIT）。
 
+## note-core 抽出メモ（2026-07-02・✅ 抽出＋ユニットテスト完了）
+- ✅ `packages/note-core` 作成（Electron 非依存・依存ゼロ・MIT 公開形）。`NoteClient`/`createNoteClient`（session 注入 = `getCookies()` 関数注入で再ログインにも追従）、`listArticles()`、`parseArticle()`、`getSelf()`。fetch DI は wpClient と同流儀。**ユニット14件グリーン**（実 note 応答形のゴールデン）、`tsc --noEmit` OK。tsconfig/vitest の include に `packages/*` を追加（npm workspaces は未導入＝install に手を入れない）。
+- **transport 検証（実測）**: 当初「Node の `fetch`(undici) が `Cookie` を落とす」と疑ったが、**ローカル echo で Cookie 送信を確認＝落とさない**。よって Node fetch＋Cookie ヘッダで問題なし。アプリでは常駐セッションから Cookie を載せる（`session.cookies.get()` は **HttpOnly 含む**全 Cookie を返す）か、Electron `net.fetch({session, useSessionCookies})` を注入すればよい（後者は note セッションを Electron 内に留められ ADR-0008 とも整合）。
+- ⚠ **実 note 認証の end-to-end 検証は未完（セッション失効で保留）**: P1 の v5 ログイン（`urlname` 確認済み）から短時間で `/settings/account` が `/login` にリダイレクト＝**セッション失効**。原因は経過時間 or **検証で多数の別プロセスから note.com を叩いたことによる無効化**の可能性大。実アプリは**単一の常駐セッション**なので churn しにくい想定。→ ライブ疎通は **P2/P5**（`host.ts` がログイン直後の生きたセッションで叩く時）に自然に実施。
+- **認証系エンドポイントの補足**: `/api/v1/stats/pv` は**`filter` 必須**（無いと `400 {"error":"filter is missing"}`）。`/api/v2/self` はブラウザ/サーバー側とも 404 になりがち。→ **ログイン真値は `/settings/account` ページ読み取り**（アプリ側）で確定し、note-core の `getSelf()` は best-effort 扱い（依存しない）。
+
 ## 9. ライセンス
 - note-mcp は **MIT**。移植部分は note-mcp の著作権＋MIT 許諾を `NOTICE`/`THIRD-PARTY` に明記。
 - note-core を公開する場合は MIT（or Apache-2.0）。アプリ本体のライセンスとは独立に選べる。
