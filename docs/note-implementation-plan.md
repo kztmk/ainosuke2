@@ -90,7 +90,7 @@ type PostTarget = WordPressTarget | NoteTarget;
 | P0 | ドメイン一般化 | ✅**土台完了(2026-07-02)** PostTarget union＋型ガード＋アダプタ。store/configWriter 分岐は note 着地(P5/P6)時に適用。 | 土台済 |
 | P1 | ログイン疎通 | ✅**完了(2026-07-02)** BrowserWindow ログイン→永続セッション→`list_articles` 実機確認。認証判定は `/settings/account` ページ読み取り。 | 完了 |
 | P2 | 中核CRUD | ✅**実装完了(2026-07-02)** create/update/get/publish/delete_draft を note-core に追加（本文はHTML直接・埋込/画像はv2）。ユニット29件。実note疎通は要ログイン時に。 | 実装済 |
-| P3 | 本文HTML忠実度 | markdown→note HTML（＋get用 逆変換） | 2〜3（最難所） |
+| P3 | 本文HTML忠実度 | ✅**前方変換 完了(2026-07-02)** markdown→note HTML（markdown-it＋note固有変換）。逆変換(html→markdown)と exotic記法は残。 | 前方済 |
 | P4 | アイキャッチ | upload_eyecatch（presigned） | 1 |
 | P5 | 常駐ホスト＋ブリッジ＋config | host.ts / note-bridge.mjs / configWriter / Claude 実機疎通 | 2 |
 | P6 | UI/状態/同意＋テスト | プラットフォーム選択・要再ログイン表示・同意・Pro gating・テスト | 2〜3 |
@@ -140,6 +140,14 @@ v1 は P0〜P2＋P4＋P5＋P6 で「ログイン→下書き作成/更新/一覧
 - **変更系ヘッダ**: `X-XSRF-TOKEN`(cookie `XSRF-TOKEN`)＋`Origin:https://editor.note.com`/`Referer`/`X-Requested-With`/`Sec-Fetch-*`＋JSON時 `Content-Type`（note-mcp `_build_headers` 準拠）。
 - **スコープ外（意図的）**: 本文の markdown⇄HTML 変換は **P3**（`bodyHtml` を入出力）、埋め込みキー解決・本文画像・アイキャッチは **v2/P4**。
 - ⚠ **実 note 疎通は未実施**（fake fetch のユニットのみ）。変更系は `XSRF-TOKEN` cookie が要る＝editor コンテキストのログインセッションが要る。ライブ検証は note ログイン直後に host.ts / 一時ハーネスで。**破壊的操作（publish/delete）はテスト用下書きで慎重に**。
+
+## P3 実装メモ（2026-07-02・前方変換 markdown→note HTML 完了）
+`packages/note-core/src/markdown/toNoteHtml.ts`（`markdownToNoteHtml(md, {genId?})`・**ゴールデン16件**・全176件・tsc OK）:
+- CommonMark ベースは **markdown-it 14**（`new MarkdownIt('commonmark').enable('strikethrough')`＝note-mcp と同条件）。note-core に依存追加（install は `--ignore-scripts`＝electron postinstall を触らない・[[electron-binary-install-workaround]]）。
+- note 固有変換（note-mcp `markdown_to_html.py` 準拠）: 画像→figure(620x457)、`<li>`→`<li><p>…</p></li>`、blockquote 内改行→`<br>`、**全要素に name/id(UUID) 付与**（`<li>`/`<blockquote>` は除外）、blockquote→figure＋**引用元(— 著者/URL)を figcaption 抽出**、code block→`<pre class="codeBlock">`（language クラス除去・pre 内改行保持・他は改行除去）。
+- **UUID は生成器注入**（既定 `crypto.randomUUID`、テストは決定的カウンタ）＝出力を安定化。
+- **残タスク（段階的忠実度）**: ①**逆変換 html→note markdown**（get_article 用・移植元 `html_to_markdown.py` 477行）②exotic 記法: `[TOC]`・テキスト整列(`->center<-`)・株式記法(`^1234`/`$AAPL`)・単独URL埋め込み(v2)。現状これらは素通り。
+- note-core CRUD は引き続き `bodyHtml` を入出力。**markdown→HTML は tools 層(P5)が本変換を挟む**（Claude からの markdown を `markdownToNoteHtml` → `createDraft`）。
 
 ## 9. ライセンス
 - note-mcp は **MIT**。移植部分は note-mcp の著作権＋MIT 許諾を `NOTICE`/`THIRD-PARTY` に明記。

@@ -4,3 +4,4 @@
  */
 export * from './models.js';
 export * from './client.js';
+export * from './markdown/toNoteHtml.js';
