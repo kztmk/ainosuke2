@@ -217,6 +217,31 @@ export const ja = {
     secret_missing: '認証情報が未保存、または再入力が必要です。',
     encryption_unavailable: 'OS の暗号化が利用できないため操作できません。',
   },
+  note: {
+    section: 'note 連携',
+    beta: 'ベータ',
+    pro: 'Pro',
+    desc: 'note.com の記事・下書きを Claude から管理します。非公式 API のため、予告なく動作しなくなる可能性があります。',
+    stateLoggedIn: 'ログイン中',
+    stateNeedsRelogin: '要ログイン',
+    loggedInAs: 'note ID: {{urlname}}',
+    login: 'note にログイン',
+    loggingIn: 'ログインしています…（開いた窓でログインしてください）',
+    logout: 'ログアウト',
+    connectToggle: '接続（Claude で使えるようにする）',
+    connected: '接続中',
+    notConnected: '未接続',
+    hostRunning: 'アプリ内ホスト常駐中',
+    needRestart: '反映には Claude の再起動が必要です。',
+    loginFailed: 'ログインを確認できませんでした。もう一度お試しください。',
+    encryptionUnavailable: 'OS の暗号化が使えないため、セッションを保存できません。',
+    needsLogin: '先に note にログインしてください。',
+    consentTitle: 'note 連携について（初回のみ）',
+    consentBody:
+      'note.com には公式 API がなく、本機能は非公式 API を利用します。予告なく壊れる可能性があり、ToS 遵守とアカウントの責任は利用者にあります。サポートはベストエフォートです。同意して続けますか？',
+    consentAgree: '同意して続ける',
+    consentCancel: 'やめる',
+  },
 } as const;
 
 export type JaResources = typeof ja;

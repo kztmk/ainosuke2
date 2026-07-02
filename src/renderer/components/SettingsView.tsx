@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useApp } from '../state.js';
 import { Button, Card, Field, Select, TextInput } from './ui.js';
 import { LicenseSection } from './LicenseSection.js';
+import { NoteAccount } from './NoteAccount.js';
 import type { Locale, ThemePref } from '../../shared/domain.js';
 
 export function SettingsView(): JSX.Element {
@@ -15,6 +16,10 @@ export function SettingsView(): JSX.Element {
       <h2 className="text-lg font-semibold">{t('settings.title')}</h2>
 
       <LicenseSection />
+
+      <div className="max-w-lg">
+        <NoteAccount />
+      </div>
 
       <Card className="max-w-lg space-y-4 p-5">
         <Field label={t('settings.language')}>
