@@ -6,3 +6,5 @@ export * from './models.js';
 export * from './client.js';
 export * from './markdown/toNoteHtml.js';
 export * from './markdown/fromNoteHtml.js';
+export * from './mcp/tools.js';
+export * from './mcp/server.js';
