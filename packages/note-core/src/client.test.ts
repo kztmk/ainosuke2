@@ -233,7 +233,17 @@ describe('createDraft', () => {
     });
   });
 
-  it('作成が非200なら失敗', async () => {
+  it('POST が 201 Created でも成功として扱う（note は作成に 201 を返す）', async () => {
+    const { fn } = recordingFetch((method, url) => {
+      if (url.endsWith('/v1/text_notes') && method === 'POST') return json({ data: { id: '1', key: 'nx' } }, 201);
+      return json({ data: { result: true } }, 201);
+    });
+    const client = new NoteClient({ getCookies: () => COOKIES, fetchFn: fn });
+    const res = await client.createDraft({ title: 't', bodyHtml: 'x' });
+    expect(res.ok).toBe(true);
+  });
+
+  it('作成が非2xxなら失敗', async () => {
     const client = new NoteClient({
       getCookies: () => COOKIES,
       fetchFn: fakeFetch(() => json({}, 401)),

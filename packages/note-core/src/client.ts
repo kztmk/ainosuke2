@@ -65,6 +65,11 @@ export function isArticleKeyFormat(articleId: string): boolean {
   return articleId.startsWith('n') && !/^\d+$/.test(articleId);
 }
 
+/** 2xx を成功とみなす（note は作成に 201 を返す等・note-mcp の is_success 準拠）。 */
+function isSuccess(status: number): boolean {
+  return status >= 200 && status < 300;
+}
+
 /** HTTP ステータスからエラーコードを導出。 */
 function codeFromStatus(status: number): NoteErrorCode {
   if (status === 401) return 'not_authenticated';
@@ -208,7 +213,7 @@ export class NoteClient {
     } catch (e) {
       return { ok: false, status: 0, code: 'api_error', error: (e as Error).message };
     }
-    if (status !== 200) return { ok: false, status, code: codeFromStatus(status), error: `HTTP ${status}` };
+    if (!isSuccess(status)) return { ok: false, status, code: codeFromStatus(status), error: `HTTP ${status}` };
     const data = (json as { data?: Record<string, unknown> } | null)?.data;
     if (!data || typeof data !== 'object') {
       return { ok: false, status, code: 'api_error', error: 'missing data' };
@@ -249,7 +254,7 @@ export class NoteClient {
     } catch (e) {
       return { ok: false, error: (e as Error).message };
     }
-    if (status !== 200) return { ok: false, status, error: `HTTP ${status}` };
+    if (!isSuccess(status)) return { ok: false, status, error: `HTTP ${status}` };
 
     const data = (json as { data?: Record<string, unknown> } | null)?.data ?? {};
     const rawNotes = Array.isArray(data['notes']) ? (data['notes'] as unknown[]) : [];
@@ -316,7 +321,7 @@ export class NoteClient {
       if (tags) createPayload['hashtags'] = tags;
 
       const created = await this.apiMutate('POST', '/v1/text_notes', createPayload);
-      if (created.status !== 200) {
+      if (!isSuccess(created.status)) {
         return { ok: false, status: created.status, code: codeFromStatus(created.status), error: `HTTP ${created.status}` };
       }
       const cdata = (created.json as { data?: Record<string, unknown> } | null)?.data ?? {};
@@ -339,7 +344,7 @@ export class NoteClient {
         `/v1/text_notes/draft_save?id=${id}&is_temp_saved=true`,
         savePayload,
       );
-      if (saved.status !== 200) {
+      if (!isSuccess(saved.status)) {
         return { ok: false, status: saved.status, code: codeFromStatus(saved.status), error: `HTTP ${saved.status}` };
       }
 
@@ -390,7 +395,7 @@ export class NoteClient {
         `/v1/text_notes/draft_save?id=${numericId}&is_temp_saved=true`,
         payload,
       );
-      if (saved.status !== 200) {
+      if (!isSuccess(saved.status)) {
         return { ok: false, status: saved.status, code: codeFromStatus(saved.status), error: `HTTP ${saved.status}` };
       }
       const sdata = (saved.json as { data?: Record<string, unknown> } | null)?.data;
@@ -467,7 +472,7 @@ export class NoteClient {
       if (tagsPub) payload['hashtags'] = tagsPub;
 
       const put = await this.apiMutate('PUT', `/v1/text_notes/${numericId}`, payload);
-      if (put.status !== 200) {
+      if (!isSuccess(put.status)) {
         return { ok: false, status: put.status, code: codeFromStatus(put.status), error: `HTTP ${put.status}` };
       }
       const pdata = (put.json as { data?: Record<string, unknown> } | null)?.data;
@@ -510,7 +515,7 @@ export class NoteClient {
       }
 
       const del = await this.apiMutate('DELETE', `/v1/notes/n/${articleKey}`);
-      if (del.status !== 200 && del.status !== 204) {
+      if (!isSuccess(del.status)) {
         return { ok: false, status: del.status, code: codeFromStatus(del.status), error: `HTTP ${del.status}` };
       }
       return { ok: true, value: { kind: 'deleted', articleKey: article.key, title: article.title } };

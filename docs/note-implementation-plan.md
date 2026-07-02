@@ -154,6 +154,16 @@ v1 は P0〜P2＋P4＋P5＋P6 で「ログイン→下書き作成/更新/一覧
 
 note-core CRUD は引き続き `bodyHtml` を入出力。**markdown⇄HTML は tools 層(P5)が挟む**（Claude の md を `markdownToNoteHtml`→`createDraft`／`getArticle` の `bodyHtml` を `noteHtmlToMarkdown`→Claude へ）。
 
+## ライブ疎通メモ（2026-07-02・✅ 実 note.com で end-to-end 成功）
+実アカウント（urlname=bungo_ai_nosuke）でログイン→生きたセッション Cookie を注入し、note-core を実 note に対して検証:
+- ✅ **認証成立**: `listArticles` が実データ7件を返す。**Node fetch＋Cookie ヘッダ（HttpOnly 含む全 Cookie）で認証が通る**ことを確定（以前の 0 件は完全にセッション失効が原因だった。undici の Cookie 落としは無い）。
+- ✅ **下書きライフサイクル**（作成→取得→更新→削除）が全工程成功。`createDraft` は markdown→note HTML 変換を通した本文で作成、`getArticle` の本文を `noteHtmlToMarkdown` で往復復元、`deleteDraft(confirm)` で後始末。
+- 🐛 **実バグを発見・修正**: note は作成に **HTTP 201** を返すが note-core が `=== 200` のみ成功扱いで失敗していた → **2xx を成功**（`isSuccess`・note-mcp の is_success 準拠）に修正。ユニット追加（201）。
+- 🔎 **XSRF-TOKEN 無しでも変更系が成功**した（`/settings/account` 経由ログインでは XSRF-TOKEN cookie が付かないが、create/update/delete とも 2xx）。＝これらのエンドポイントはセッション Cookie で足りる。`X-XSRF-TOKEN` は cookie がある時のみ送る実装なので無害。
+- ⚠ **getSelf は実環境でも失敗**（pv=400 `filter is missing`／self=404）。**ログイン真値は `/settings/account` ページ読み取り**が正（既定どおり）。
+- ⚠ **要確認**: `listArticles({status:'draft'})`（`publish_status=draft`）が公開記事を返した（フィルタ未適用に見える）。実害は小さいが note の当該パラメータ挙動を後日確認。
+- セッションは短命なので、ライブ検証は**ログイン直後**に行うこと。検証用ハーネスは `scratchpad/note-poc/login-dump.cjs`（gitignore・cookies.json はセッション Cookie を含むため検証後に削除）。
+
 ## 9. ライセンス
 - note-mcp は **MIT**。移植部分は note-mcp の著作権＋MIT 許諾を `NOTICE`/`THIRD-PARTY` に明記。
 - note-core を公開する場合は MIT（or Apache-2.0）。アプリ本体のライセンスとは独立に選べる。
