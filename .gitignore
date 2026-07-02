@@ -18,3 +18,6 @@ google-oauth.local.json
 .env
 .env.*
 !.env.example
+
+# session scratch (PoC, clones)
+scratchpad/
