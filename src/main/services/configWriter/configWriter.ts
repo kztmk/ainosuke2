@@ -33,6 +33,25 @@ export interface McpServerEntry {
   env: Record<string, string>;
 }
 
+/** note 投稿先の接続入力（ADR-0008 D: bridge エントリ。note 認証情報は載せない）。 */
+export interface NoteConnectionInput {
+  /** 内部 uuid。env.WP_MCP_MANAGER_ID に書き、自社エントリ識別に使う（WordPress と共通） */
+  managerId: string;
+  /** mcpServers のキーに使う表示名（一意・トリム済み） */
+  displayName: string;
+  /** 同梱 note-bridge.mjs の絶対パス */
+  bridgePath: string;
+  /** アプリ常駐ホストの localhost URL（毎起動で変わりうる） */
+  bridgeUrl: string;
+  /** Bearer ローカルアクセストークン（localhost 限定・回転可・非アカウント） */
+  bridgeToken: string;
+  /** bridge を起動する node 実行ファイル（既定 'node'） */
+  nodePath?: string;
+}
+
+export const NOTE_BRIDGE_URL_ENV = 'NOTE_BRIDGE_URL';
+export const NOTE_BRIDGE_TOKEN_ENV = 'NOTE_BRIDGE_TOKEN';
+
 export interface ClaudeConfig {
   mcpServers?: Record<string, McpServerEntry>;
   /** 他アプリが書いたトップレベルキーを保持するための index signature */
@@ -62,6 +81,19 @@ function buildEntry(input: SiteConnectionInput): McpServerEntry {
   };
 }
 
+/** note bridge エントリを組み立て（config には localhost URL＋Bearer トークンのみ・秘密は載せない）。 */
+function buildNoteEntry(input: NoteConnectionInput): McpServerEntry {
+  return {
+    command: input.nodePath ?? 'node',
+    args: [input.bridgePath],
+    env: {
+      [NOTE_BRIDGE_URL_ENV]: input.bridgeUrl,
+      [NOTE_BRIDGE_TOKEN_ENV]: input.bridgeToken,
+      [MANAGER_ID_ENV]: input.managerId,
+    },
+  };
+}
+
 /** env.WP_MCP_MANAGER_ID が一致する既存キーを返す（無ければ undefined） */
 function findOwnedKey(config: ClaudeConfig, managerId: string): string | undefined {
   const servers = config.mcpServers ?? {};
@@ -79,16 +111,33 @@ export class ConfigWriter {
    * 同一 managerId への再実行は冪等な更新。
    */
   async connect(input: SiteConnectionInput): Promise<WriteResult> {
+    return this.upsertEntry(input.managerId, input.displayName, buildEntry(input));
+  }
+
+  /**
+   * note 投稿先の接続（bridge エントリを書く・ADR-0008 D）。URL/token は毎起動で変わりうるため、
+   * 起動時の再接続でも同一 managerId への冪等な更新になる。
+   */
+  async connectNote(input: NoteConnectionInput): Promise<WriteResult> {
+    return this.upsertEntry(input.managerId, input.displayName, buildNoteEntry(input));
+  }
+
+  /** connect / connectNote 共通: 衝突チェック＋改名（旧キー削除）＋エントリ書込。 */
+  private async upsertEntry(
+    managerId: string,
+    displayName: string,
+    entry: McpServerEntry,
+  ): Promise<WriteResult> {
     const read = await this.readConfig();
     if (read.kind === 'corrupt') return this.corrupt();
 
     const config: ClaudeConfig = read.kind === 'ok' ? read.config : { mcpServers: {} };
     config.mcpServers ??= {};
 
-    const targetKey = input.displayName;
+    const targetKey = displayName;
     const existing = config.mcpServers[targetKey];
     // 衝突: 対象キーが既に存在し、それが自社（同一 managerId）でない → ブロック
-    if (existing && existing.env?.[MANAGER_ID_ENV] !== input.managerId) {
+    if (existing && existing.env?.[MANAGER_ID_ENV] !== managerId) {
       return {
         ok: false,
         reason: 'key_collision',
@@ -97,10 +146,10 @@ export class ConfigWriter {
     }
 
     // 自社エントリが別キーに存在（改名）→ 旧キーを削除
-    const ownedKey = findOwnedKey(config, input.managerId);
+    const ownedKey = findOwnedKey(config, managerId);
     if (ownedKey && ownedKey !== targetKey) delete config.mcpServers[ownedKey];
 
-    config.mcpServers[targetKey] = buildEntry(input);
+    config.mcpServers[targetKey] = entry;
     await this.atomicWrite(config);
     return { ok: true };
   }
