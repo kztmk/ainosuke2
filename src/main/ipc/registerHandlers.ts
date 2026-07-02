@@ -5,12 +5,31 @@
 import { ipcMain } from 'electron';
 import { IPC_INVOKE } from '../../shared/ipc.js';
 import type { AppService } from '../appService/appService.js';
-import type { GoogleSignInResult, LogFilter, SiteInput, TemplateInput, TestTarget } from '../../shared/ipc.js';
+import type {
+  GoogleSignInResult,
+  LogFilter,
+  NoteConnectResult,
+  NoteLoginResult,
+  NoteStatus,
+  SiteInput,
+  TemplateInput,
+  TestTarget,
+} from '../../shared/ipc.js';
 import type { AppSettings, Feature } from '../../shared/domain.js';
 
-/** AppService に属さない main 固有のハンドラ（OAuth 等）。 */
+/** note 投稿先ハンドラ（NoteController が構造的に満たす）。 */
+export interface NoteHandlers {
+  status(): NoteStatus | Promise<NoteStatus>;
+  login(): Promise<NoteLoginResult>;
+  logout(): Promise<void>;
+  connect(): Promise<NoteConnectResult>;
+  disconnect(): Promise<NoteConnectResult>;
+}
+
+/** AppService に属さない main 固有のハンドラ（OAuth・note 等）。 */
 export interface ExtraHandlers {
   googleSignIn(): Promise<GoogleSignInResult>;
+  note: NoteHandlers;
 }
 
 export function registerHandlers(app: AppService, extra: ExtraHandlers): void {
@@ -59,6 +78,12 @@ export function registerHandlers(app: AppService, extra: ExtraHandlers): void {
   h(IPC_INVOKE.licenseDeactivate, () => app.licenseDeactivate());
 
   h(IPC_INVOKE.authGoogleSignIn, () => extra.googleSignIn());
+
+  h(IPC_INVOKE.noteStatus, () => extra.note.status());
+  h(IPC_INVOKE.noteLogin, () => extra.note.login());
+  h(IPC_INVOKE.noteLogout, () => extra.note.logout());
+  h(IPC_INVOKE.noteConnect, () => extra.note.connect());
+  h(IPC_INVOKE.noteDisconnect, () => extra.note.disconnect());
 
   h(IPC_INVOKE.shellOpenExternal, (_e, url: string) => app.shellOpenExternal(url));
 }

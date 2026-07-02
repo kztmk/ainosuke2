@@ -2,12 +2,13 @@
  * realDeps — 本物の Electron / Node 依存を各サービスへ注入して AppService を組み立てる。
  * テストではこのファイルは使わず、フェイクを注入する（appService.test.ts 参照）。
  */
-import { safeStorage, shell } from 'electron';
+import { app, safeStorage, shell } from 'electron';
 import Store from 'electron-store';
 import { exec } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
+import path from 'node:path';
 
 import {
   DEFAULT_SETTINGS,
@@ -40,6 +41,11 @@ import {
   type TemplateBackend,
 } from './services/templateStore/templateStore.js';
 import { WpClient } from './services/wpClient/wpClient.js';
+import { NoteSessionStore } from './note/session.js';
+import { NoteService } from './note/noteService.js';
+import { NoteController } from './note/noteController.js';
+import { startNoteHost } from './note/host.js';
+import { createNoteLoginBrowser } from './note/electronLoginBrowser.js';
 
 /**
  * ライセンス署名検証用の公開鍵（Ed25519・SPKI/PEM）。
@@ -135,4 +141,35 @@ export function buildAppService(
     openExternal: (url) => shell.openExternal(url),
     emitSiteStatus,
   });
+}
+
+/**
+ * 同梱 note-bridge.mjs の絶対パスを解決する。
+ * ※ 配布時は bridge と @modelcontextprotocol/sdk を asarUnpack/resources に含める必要がある（P6/配布 TODO）。
+ */
+function resolveNoteBridgePath(): string {
+  return path.join(app.getAppPath(), 'src', 'main', 'note', 'bridge', 'note-bridge.mjs');
+}
+
+/**
+ * NoteController を組み立てる（ADR-0008 D）。config は WordPress と同じ claude_desktop_config.json。
+ * note セッションは safeStorage 暗号化保存。ホスト起動/ログイン窓は Electron 実装を注入。
+ */
+export function buildNoteController(configPath: string): NoteController {
+  const store = new Store();
+  const kv: KeyValueStore = {
+    get: (key) => store.get(key) as string | undefined,
+    set: (key, value) => store.set(key, value),
+    delete: (key) => store.delete(key),
+  };
+
+  const service = new NoteService({
+    session: new NoteSessionStore(kv, safeStorage),
+    configWriter: new ConfigWriter(configPath),
+    bridgePath: resolveNoteBridgePath(),
+    startHost: (client) => startNoteHost(client),
+    createLoginBrowser: () => createNoteLoginBrowser(),
+  });
+
+  return new NoteController({ service, kv, idFactory: () => randomUUID() });
 }

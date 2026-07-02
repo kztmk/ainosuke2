@@ -74,6 +74,13 @@ const api: IpcApi = {
   auth: {
     googleSignIn: () => ipcRenderer.invoke(IPC_INVOKE.authGoogleSignIn),
   },
+  note: {
+    status: () => ipcRenderer.invoke(IPC_INVOKE.noteStatus),
+    login: () => ipcRenderer.invoke(IPC_INVOKE.noteLogin),
+    logout: () => ipcRenderer.invoke(IPC_INVOKE.noteLogout),
+    connect: () => ipcRenderer.invoke(IPC_INVOKE.noteConnect),
+    disconnect: () => ipcRenderer.invoke(IPC_INVOKE.noteDisconnect),
+  },
   shell: {
     openExternal: (url) => ipcRenderer.invoke(IPC_INVOKE.shellOpenExternal, url),
   },

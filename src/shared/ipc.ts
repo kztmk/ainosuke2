@@ -15,6 +15,7 @@ import type {
   LicenseStatus,
   LogEntry,
   LogType,
+  NoteLoginState,
   Site,
   SiteWarning,
 } from './domain.js';
@@ -64,6 +65,27 @@ export type ConnectResult =
         | 'encryption_unavailable'; // safeStorage 利用不可（未決#1）
       message: string;
     };
+
+/** note 投稿先の状態（接続=config 軸 ＋ ログイン軸・CONTEXT.md / ADR-0008）。 */
+export interface NoteStatus {
+  loginState: NoteLoginState;
+  /** ログイン中に確認した note ID（urlname）。 */
+  urlname: string | null;
+  /** アプリ内 MCP ホストが常駐しているか（Claude から使える前提の一つ）。 */
+  hostRunning: boolean;
+  /** claude_desktop_config.json に bridge エントリが書かれているか。 */
+  connected: boolean;
+}
+
+/** note ログイン結果（BrowserWindow ログイン → Cookie 暗号化保存）。 */
+export type NoteLoginResult =
+  | { ok: true; urlname: string }
+  | { ok: false; reason: 'timeout' | 'encryption_unavailable' };
+
+/** note 接続（config への bridge エントリ書込）の結果。 */
+export type NoteConnectResult =
+  | { ok: true }
+  | { ok: false; reason: 'needs_login' | 'parse_error' | 'key_collision'; message?: string };
 
 /** 接続テスト（§5.3.1）の結果。REST と MCP を分けて返す。 */
 export interface TestResult {
@@ -186,6 +208,22 @@ export interface IpcApi {
     googleSignIn(): Promise<GoogleSignInResult>;
   };
 
+  /**
+   * note 投稿先（ADR-0008 D・Pro／ベータ）。ログインはアプリ側で行い（Claude に触らせない）、
+   * 接続は config に bridge エントリを書くだけ（note 認証情報は config に出ない）。
+   */
+  note: {
+    status(): Promise<NoteStatus>;
+    /** BrowserWindow で note にログイン → 全 Cookie を暗号化保存。reCAPTCHA は窓で手動。 */
+    login(): Promise<NoteLoginResult>;
+    /** セッション破棄＋ホスト停止＋config 解除。 */
+    logout(): Promise<void>;
+    /** 接続 ON: ホスト常駐＋config へ bridge エントリ書込。要ログイン。 */
+    connect(): Promise<NoteConnectResult>;
+    /** 接続 OFF: config から外す＋ホスト停止。 */
+    disconnect(): Promise<NoteConnectResult>;
+  };
+
   shell: {
     /** OS 既定ブラウザで開く（§5.1.4）。 */
     openExternal(url: string): Promise<void>;
@@ -238,6 +276,11 @@ export const IPC_INVOKE = {
   licenseActivate: 'license:activate',
   licenseDeactivate: 'license:deactivate',
   authGoogleSignIn: 'auth:googleSignIn',
+  noteStatus: 'note:status',
+  noteLogin: 'note:login',
+  noteLogout: 'note:logout',
+  noteConnect: 'note:connect',
+  noteDisconnect: 'note:disconnect',
   shellOpenExternal: 'shell:openExternal',
 } as const;
 

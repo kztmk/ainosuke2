@@ -6,8 +6,9 @@ import { app, BrowserWindow, Menu, nativeImage, shell, Tray } from 'electron';
 import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { buildAppService } from './realDeps.js';
+import { buildAppService, buildNoteController } from './realDeps.js';
 import { registerHandlers } from './ipc/registerHandlers.js';
+import type { NoteController } from './note/noteController.js';
 import { signInWithGoogleLoopback } from './services/googleAuth/googleAuth.js';
 import { loadGoogleOAuth } from './googleOAuth.js';
 import { StatusMonitor, type IntervalScheduler } from './services/statusMonitor/statusMonitor.js';
@@ -16,6 +17,7 @@ import { IPC_EVENT } from '../shared/ipc.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 let mainWindow: BrowserWindow | null = null;
+let noteController: NoteController | null = null;
 let tray: Tray | null = null;
 let isQuitting = false;
 
@@ -121,6 +123,7 @@ void app.whenReady().then(() => {
   const appService = buildAppService((site) => {
     if (!win.isDestroyed()) win.webContents.send(IPC_EVENT.siteStatusChanged, site);
   });
+  noteController = buildNoteController(appService.claudeConfigPath());
   registerHandlers(appService, {
     googleSignIn: () =>
       signInWithGoogleLoopback({
@@ -128,7 +131,10 @@ void app.whenReady().then(() => {
         openExternal: (url) => shell.openExternal(url),
         fetch: globalThis.fetch,
       }),
+    note: noteController,
   });
+  // note が接続中だった場合、新しい host URL/token で config を再確立する（ADR-0008 D）。
+  void noteController.resumeOnStartup();
   setupTray(win);
 
   // §5.3.2 / §5.4.1 起動時の疎通確認＋バックグラウンド監視（自動監視は Pro）
@@ -157,6 +163,7 @@ void app.whenReady().then(() => {
 
 app.on('before-quit', () => {
   isQuitting = true;
+  void noteController?.dispose();
 });
 
 app.on('window-all-closed', () => {
