@@ -5,7 +5,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { NoteClient, createNoteClient, buildCookieHeader, parseArticle, type FetchLike } from './client.js';
 
-const COOKIES = { _note_session_v5: 'sess', note_gql_auth_token: 'gql', XSRF_TOKEN: 'x' };
+const COOKIES = { _note_session_v5: 'sess', note_gql_auth_token: 'gql', 'XSRF-TOKEN': 'xtok' };
 
 function fakeFetch(responder: (url: string, init?: RequestInit) => Response): FetchLike {
   return vi.fn(async (url: string, init?: RequestInit) => responder(url, init));
@@ -13,6 +13,21 @@ function fakeFetch(responder: (url: string, init?: RequestInit) => Response): Fe
 
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
+}
+
+/** メソッド/URL/ヘッダ/ボディを記録するフェイク fetch。 */
+function recordingFetch(responder: (method: string, url: string, body: unknown) => Response): {
+  fn: FetchLike;
+  calls: Array<{ method: string; url: string; headers: Record<string, string>; body: unknown }>;
+} {
+  const calls: Array<{ method: string; url: string; headers: Record<string, string>; body: unknown }> = [];
+  const fn: FetchLike = vi.fn(async (url: string, init?: RequestInit) => {
+    const method = init?.method ?? 'GET';
+    const body = init?.body ? JSON.parse(String(init.body)) : undefined;
+    calls.push({ method, url, headers: (init?.headers ?? {}) as Record<string, string>, body });
+    return responder(method, url, body);
+  });
+  return { fn, calls };
 }
 
 // 実 note の note_list/contents 応答を模したノート1件（第7回…）。
@@ -90,7 +105,7 @@ describe('listArticles', () => {
       expect.objectContaining({
         headers: expect.objectContaining({
           Accept: 'application/json',
-          Cookie: '_note_session_v5=sess; note_gql_auth_token=gql; XSRF_TOKEN=x',
+          Cookie: '_note_session_v5=sess; note_gql_auth_token=gql; XSRF-TOKEN=xtok',
         }),
       }),
     );
@@ -185,5 +200,181 @@ describe('getSelf', () => {
     const res = await client.getSelf();
     expect(res.ok).toBe(false);
     if (!res.ok) expect(res.status).toBe(404);
+  });
+});
+
+describe('createDraft', () => {
+  it('本文なし作成→draft_save の2段で id/key を返し、変更系ヘッダを付ける', async () => {
+    const { fn, calls } = recordingFetch((method, url) => {
+      if (url.endsWith('/v1/text_notes') && method === 'POST') return json({ data: { id: '123', key: 'nabc' } });
+      if (url.includes('/draft_save') && method === 'POST') return json({ data: { result: true } });
+      return json({}, 500);
+    });
+    const client = new NoteClient({ getCookies: () => COOKIES, fetchFn: fn });
+    const res = await client.createDraft({ title: 'タイトル', bodyHtml: '<p>本文</p>', tags: ['#AI', 'note'] });
+
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.value).toMatchObject({ id: '123', key: 'nabc', title: 'タイトル', status: 'draft', tags: ['AI', 'note'] });
+    }
+    // Step1: 本文なし
+    expect(calls[0]?.url).toBe('https://note.com/api/v1/text_notes');
+    expect(calls[0]?.body).toEqual({ name: 'タイトル', index: false, is_lead_form: false, hashtags: [{ hashtag: { name: 'AI' } }, { hashtag: { name: 'note' } }] });
+    // Step2: draft_save に本文と body_length
+    expect(calls[1]?.url).toBe('https://note.com/api/v1/text_notes/draft_save?id=123&is_temp_saved=true');
+    expect(calls[1]?.body).toMatchObject({ name: 'タイトル', body: '<p>本文</p>', body_length: 9 });
+    // 変更系ヘッダ
+    expect(calls[0]?.headers).toMatchObject({
+      'X-XSRF-TOKEN': 'xtok',
+      Origin: 'https://editor.note.com',
+      Referer: 'https://editor.note.com/',
+      'X-Requested-With': 'XMLHttpRequest',
+      'Content-Type': 'application/json',
+    });
+  });
+
+  it('作成が非200なら失敗', async () => {
+    const client = new NoteClient({
+      getCookies: () => COOKIES,
+      fetchFn: fakeFetch(() => json({}, 401)),
+    });
+    const res = await client.createDraft({ title: 't', bodyHtml: 'x' });
+    expect(res).toMatchObject({ ok: false, status: 401, code: 'not_authenticated' });
+  });
+
+  it('id/key が返らなければ api_error', async () => {
+    const client = new NoteClient({
+      getCookies: () => COOKIES,
+      fetchFn: fakeFetch(() => json({ data: {} })),
+    });
+    const res = await client.createDraft({ title: 't', bodyHtml: 'x' });
+    expect(res).toMatchObject({ ok: false, code: 'api_error' });
+  });
+});
+
+describe('updateDraft', () => {
+  it('key形式は数値IDへ解決してから draft_save する', async () => {
+    const { fn, calls } = recordingFetch((method, url) => {
+      if (url.endsWith('/v3/notes/nabc') && method === 'GET') return json({ data: { id: '123', key: 'nabc' } });
+      if (url.includes('/draft_save') && method === 'POST') return json({ data: { result: true } });
+      return json({}, 500);
+    });
+    const client = new NoteClient({ getCookies: () => COOKIES, fetchFn: fn });
+    const res = await client.updateDraft('nabc', { title: '新', bodyHtml: '<p>x</p>' });
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.value).toMatchObject({ id: '123', key: 'nabc', title: '新', status: 'draft' });
+    expect(calls[0]?.url).toBe('https://note.com/api/v3/notes/nabc');
+    expect(calls[1]?.url).toBe('https://note.com/api/v1/text_notes/draft_save?id=123&is_temp_saved=true');
+  });
+
+  it('数値IDはそのまま draft_save（解決の GET を打たない）', async () => {
+    const { fn, calls } = recordingFetch(() => json({ data: { result: true } }));
+    const client = new NoteClient({ getCookies: () => COOKIES, fetchFn: fn });
+    await client.updateDraft('999', { title: 't', bodyHtml: 'x' });
+    expect(calls).toHaveLength(1);
+    expect(calls[0]?.url).toBe('https://note.com/api/v1/text_notes/draft_save?id=999&is_temp_saved=true');
+  });
+
+  it('draft_save が result を欠くと api_error', async () => {
+    const client = new NoteClient({ getCookies: () => COOKIES, fetchFn: fakeFetch(() => json({ data: {} })) });
+    const res = await client.updateDraft('999', { title: 't', bodyHtml: 'x' });
+    expect(res).toMatchObject({ ok: false, code: 'api_error' });
+  });
+});
+
+describe('getArticle', () => {
+  it('本文つきで返す（HTMLのまま）', async () => {
+    const client = new NoteClient({
+      getCookies: () => COOKIES,
+      fetchFn: fakeFetch(() => json({ data: { id: '1', key: 'nabc', name: 'T', status: 'published', body: '<p>本文</p>' } })),
+    });
+    const res = await client.getArticle('nabc');
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.value).toMatchObject({ key: 'nabc', title: 'T', status: 'published', bodyHtml: '<p>本文</p>' });
+  });
+
+  it('数値IDは invalid_input', async () => {
+    const client = new NoteClient({ getCookies: () => COOKIES, fetchFn: fakeFetch(() => json({})) });
+    const res = await client.getArticle('12345');
+    expect(res).toMatchObject({ ok: false, code: 'invalid_input' });
+  });
+
+  it("status='deleted' は not_found", async () => {
+    const client = new NoteClient({
+      getCookies: () => COOKIES,
+      fetchFn: fakeFetch(() => json({ data: { id: '1', key: 'nabc', status: 'deleted', body: '' } })),
+    });
+    const res = await client.getArticle('nabc');
+    expect(res).toMatchObject({ ok: false, code: 'not_found' });
+  });
+
+  it('404 は not_found', async () => {
+    const client = new NoteClient({ getCookies: () => COOKIES, fetchFn: fakeFetch(() => json({}, 404)) });
+    const res = await client.getArticle('nabc');
+    expect(res).toMatchObject({ ok: false, status: 404, code: 'not_found' });
+  });
+});
+
+describe('publishArticle', () => {
+  it('PUT /v1/text_notes/{id} に free_body・#tag・status=published を送り、再取得して返す', async () => {
+    const { fn, calls } = recordingFetch((method, url) => {
+      if (url.endsWith('/v3/notes/nabc') && method === 'GET') {
+        return json({ data: { id: '123', key: 'nabc', name: 'T', status: 'draft', note_draft: { name: 'T', body: '<p>b</p>' } } });
+      }
+      if (url.endsWith('/v1/text_notes/123') && method === 'PUT') return json({ data: { result: true } });
+      return json({}, 500);
+    });
+    const client = new NoteClient({ getCookies: () => COOKIES, fetchFn: fn });
+    const res = await client.publishArticle('nabc', ['AI']);
+    expect(res.ok).toBe(true);
+    const put = calls.find((c) => c.method === 'PUT');
+    expect(put?.url).toBe('https://note.com/api/v1/text_notes/123');
+    expect(put?.body).toMatchObject({ name: 'T', free_body: '<p>b</p>', status: 'published', index: false, hashtags: ['#AI'] });
+  });
+
+  it('result=false は api_error', async () => {
+    const client = new NoteClient({
+      getCookies: () => COOKIES,
+      fetchFn: fakeFetch((url) => {
+        if (url.endsWith('/v3/notes/nabc')) return json({ data: { id: '123', key: 'nabc', name: 'T', status: 'draft' } });
+        return json({ data: { result: false } });
+      }),
+    });
+    const res = await client.publishArticle('nabc');
+    expect(res).toMatchObject({ ok: false, code: 'api_error' });
+  });
+});
+
+describe('deleteDraft', () => {
+  const draftData = { data: { id: '1', key: 'nabc', name: 'D', status: 'draft' } };
+
+  it('confirm=false はプレビューを返し、DELETE を打たない', async () => {
+    const { fn, calls } = recordingFetch(() => json(draftData));
+    const client = new NoteClient({ getCookies: () => COOKIES, fetchFn: fn });
+    const res = await client.deleteDraft('nabc');
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.value).toEqual({ kind: 'preview', articleKey: 'nabc', title: 'D', status: 'draft' });
+    expect(calls.some((c) => c.method === 'DELETE')).toBe(false);
+  });
+
+  it('confirm=true は DELETE /v1/notes/n/{key} を打つ', async () => {
+    const { fn, calls } = recordingFetch((method, url) => {
+      if (method === 'DELETE') return json({}, 200);
+      return json(draftData);
+    });
+    const client = new NoteClient({ getCookies: () => COOKIES, fetchFn: fn });
+    const res = await client.deleteDraft('nabc', { confirm: true });
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.value).toEqual({ kind: 'deleted', articleKey: 'nabc', title: 'D' });
+    expect(calls.find((c) => c.method === 'DELETE')?.url).toBe('https://note.com/api/v1/notes/n/nabc');
+  });
+
+  it('公開記事は published_cannot_delete', async () => {
+    const client = new NoteClient({
+      getCookies: () => COOKIES,
+      fetchFn: fakeFetch(() => json({ data: { id: '1', key: 'nabc', name: 'P', status: 'published' } })),
+    });
+    const res = await client.deleteDraft('nabc', { confirm: true });
+    expect(res).toMatchObject({ ok: false, code: 'published_cannot_delete' });
   });
 });

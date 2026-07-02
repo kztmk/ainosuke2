@@ -35,12 +35,46 @@ export interface NoteArticle {
   url: string | null;
 }
 
+/** 本文つき記事（get_article・作成/更新/公開の戻り）。本文は note 専用 HTML。 */
+export interface NoteArticleDetail extends NoteArticle {
+  /** 本文（note 専用 HTML）。P2 は HTML をそのまま扱い、markdown 変換は P3 で追加。 */
+  bodyHtml: string;
+}
+
+/** 記事の作成・更新の入力。P2 では本文は HTML 前提（markdown→HTML は P3）。 */
+export interface NoteArticleInput {
+  title: string;
+  /** 本文（note 専用 HTML）。 */
+  bodyHtml: string;
+  /** ハッシュタグ（# は有無どちらでも可・内部で正規化）。 */
+  tags?: string[];
+}
+
+/** 下書き削除の 2 段階フロー結果。 */
+export type DeleteDraftOutcome =
+  | { kind: 'preview'; articleKey: string; title: string; status: NoteArticleStatus }
+  | { kind: 'deleted'; articleKey: string; title: string };
+
 /** 現在のログインユーザー（認証確認用の最小情報）。 */
 export interface NoteSelf {
   id: string;
   /** note ID（URL 名・例: bungo_ai_nosuke） */
   urlname: string;
 }
+
+/** note API エラーの分類（HTTP ステータス＋論理チェックから導出）。 */
+export type NoteErrorCode =
+  | 'not_authenticated'
+  | 'not_found'
+  | 'invalid_input'
+  | 'rate_limited'
+  | 'published_cannot_delete'
+  | 'api_error';
+
+/** 汎用の結果型（例外を投げず discriminated union で返す・wpClient と同流儀）。 */
+export type NoteResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; status?: number; code: NoteErrorCode; error: string };
 
 /** 一覧取得結果（discriminated union・throw しない方針は wpClient と同じ）。 */
 export type ListArticlesResult =

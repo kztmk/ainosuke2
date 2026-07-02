@@ -89,7 +89,7 @@ type PostTarget = WordPressTarget | NoteTarget;
 |----|------|---------|------|
 | P0 | ドメイン一般化 | ✅**土台完了(2026-07-02)** PostTarget union＋型ガード＋アダプタ。store/configWriter 分岐は note 着地(P5/P6)時に適用。 | 土台済 |
 | P1 | ログイン疎通 | ✅**完了(2026-07-02)** BrowserWindow ログイン→永続セッション→`list_articles` 実機確認。認証判定は `/settings/account` ページ読み取り。 | 完了 |
-| P2 | 中核CRUD | create/update/get/list/publish/delete_draft | 2〜3 |
+| P2 | 中核CRUD | ✅**実装完了(2026-07-02)** create/update/get/publish/delete_draft を note-core に追加（本文はHTML直接・埋込/画像はv2）。ユニット29件。実note疎通は要ログイン時に。 | 実装済 |
 | P3 | 本文HTML忠実度 | markdown→note HTML（＋get用 逆変換） | 2〜3（最難所） |
 | P4 | アイキャッチ | upload_eyecatch（presigned） | 1 |
 | P5 | 常駐ホスト＋ブリッジ＋config | host.ts / note-bridge.mjs / configWriter / Claude 実機疎通 | 2 |
@@ -129,6 +129,17 @@ v1 は P0〜P2＋P4＋P5＋P6 で「ログイン→下書き作成/更新/一覧
 - **transport 検証（実測）**: 当初「Node の `fetch`(undici) が `Cookie` を落とす」と疑ったが、**ローカル echo で Cookie 送信を確認＝落とさない**。よって Node fetch＋Cookie ヘッダで問題なし。アプリでは常駐セッションから Cookie を載せる（`session.cookies.get()` は **HttpOnly 含む**全 Cookie を返す）か、Electron `net.fetch({session, useSessionCookies})` を注入すればよい（後者は note セッションを Electron 内に留められ ADR-0008 とも整合）。
 - ⚠ **実 note 認証の end-to-end 検証は未完（セッション失効で保留）**: P1 の v5 ログイン（`urlname` 確認済み）から短時間で `/settings/account` が `/login` にリダイレクト＝**セッション失効**。原因は経過時間 or **検証で多数の別プロセスから note.com を叩いたことによる無効化**の可能性大。実アプリは**単一の常駐セッション**なので churn しにくい想定。→ ライブ疎通は **P2/P5**（`host.ts` がログイン直後の生きたセッションで叩く時）に自然に実施。
 - **認証系エンドポイントの補足**: `/api/v1/stats/pv` は**`filter` 必須**（無いと `400 {"error":"filter is missing"}`）。`/api/v2/self` はブラウザ/サーバー側とも 404 になりがち。→ **ログイン真値は `/settings/account` ページ読み取り**（アプリ側）で確定し、note-core の `getSelf()` は best-effort 扱い（依存しない）。
+
+## P2 実装メモ（2026-07-02・note-core CRUD 完了）
+`packages/note-core` に 5 メソッド追加（fetch DI・discriminated result・**ユニット29件グリーン**・tsc OK・全160件）:
+- `createDraft(input)`: POST `/v1/text_notes`（本文なし→id/key）→ POST `/v1/text_notes/draft_save?id={id}&is_temp_saved=true`（本文）。
+- `updateDraft(articleId, input)`: key は数値IDへ解決（GET `/v3/notes/{key}` → data.id）→ draft_save。応答は最小 `{result}` なので入力から再構成。
+- `getArticle(key)`: GET `/v3/notes/{key}`（key 形式必須・数値不可）。`status='deleted'` は not_found。**本文は HTML のまま返す**。
+- `publishArticle(key, tags?)`: 記事取得（下書きは `note_draft.body` 優先）→ PUT `/v1/text_notes/{numericId}`（`free_body`・`status:'published'`・`#tag` 形式）→ 再取得して返す。
+- `deleteDraft(key, {confirm})`: 2段階。公開記事は `published_cannot_delete`。confirm時 DELETE `/v1/notes/n/{key}`。
+- **変更系ヘッダ**: `X-XSRF-TOKEN`(cookie `XSRF-TOKEN`)＋`Origin:https://editor.note.com`/`Referer`/`X-Requested-With`/`Sec-Fetch-*`＋JSON時 `Content-Type`（note-mcp `_build_headers` 準拠）。
+- **スコープ外（意図的）**: 本文の markdown⇄HTML 変換は **P3**（`bodyHtml` を入出力）、埋め込みキー解決・本文画像・アイキャッチは **v2/P4**。
+- ⚠ **実 note 疎通は未実施**（fake fetch のユニットのみ）。変更系は `XSRF-TOKEN` cookie が要る＝editor コンテキストのログインセッションが要る。ライブ検証は note ログイン直後に host.ts / 一時ハーネスで。**破壊的操作（publish/delete）はテスト用下書きで慎重に**。
 
 ## 9. ライセンス
 - note-mcp は **MIT**。移植部分は note-mcp の著作権＋MIT 許諾を `NOTICE`/`THIRD-PARTY` に明記。
