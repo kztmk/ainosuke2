@@ -92,7 +92,7 @@ type PostTarget = WordPressTarget | NoteTarget;
 | P2 | 中核CRUD | ✅**実装完了(2026-07-02)** create/update/get/publish/delete_draft を note-core に追加（本文はHTML直接・埋込/画像はv2）。ユニット29件。実note疎通は要ログイン時に。 | 実装済 |
 | P3 | 本文HTML忠実度 | ✅**双方向 完了(2026-07-02)** markdown⇄note HTML（markdown-it＋note固有変換／逆変換は往復一致）。exotic記法(TOC/整列/株式/埋込)は残。 | 双方向済 |
 | P4 | アイキャッチ | upload_eyecatch（presigned） | 1 |
-| P5 | 常駐ホスト＋ブリッジ＋config | host.ts / note-bridge.mjs / configWriter / Claude 実機疎通 | 2 |
+| P5 | 常駐ホスト＋ブリッジ＋config | ✅**中核完了(2026-07-02)** tools/server/host/bridge/session/login/configWriter分岐/NoteService。フルチェーンe2e済。残=IPC/realDeps/renderer(P6)・Claude実機。 | 中核済 |
 | P6 | UI/状態/同意＋テスト | プラットフォーム選択・要再ログイン表示・同意・Pro gating・テスト | 2〜3 |
 
 v1 は P0〜P2＋P4＋P5＋P6 で「ログイン→下書き作成/更新/一覧/公開＋アイキャッチが Claude から動く」。P3 は忠実度を継続改善。
@@ -163,6 +163,17 @@ note-core CRUD は引き続き `bodyHtml` を入出力。**markdown⇄HTML は t
 - ⚠ **getSelf は実環境でも失敗**（pv=400 `filter is missing`／self=404）。**ログイン真値は `/settings/account` ページ読み取り**が正（既定どおり）。
 - ⚠ **要確認**: `listArticles({status:'draft'})`（`publish_status=draft`）が公開記事を返した（フィルタ未適用に見える）。実害は小さいが note の当該パラメータ挙動を後日確認。
 - セッションは短命なので、ライブ検証は**ログイン直後**に行うこと。検証用ハーネスは `scratchpad/note-poc/login-dump.cjs`（gitignore・cookies.json はセッション Cookie を含むため検証後に削除）。
+
+## P5 実装メモ（2026-07-02・中核配線 完了）
+ADR-0008 D の実行経路を実装・テスト。**フルチェーン e2e**（Client→stdio→bridge子プロセス→HTTP→host→note-core）が通ることを確認。
+- **MCP ツール層**（`packages/note-core/src/mcp/`）: `tools.ts`=v1 6ツール（create_draft/get_article/update_article/publish_article/list_articles/delete_draft・SDK非依存の純ハンドラ・md⇄HTML変換を挟む・認証切れはアプリ側ログイン促し＝ログインはツールにしない）。`server.ts`=`createNoteMcpServer(client)`。依存に `@modelcontextprotocol/sdk`＋`zod`（`--ignore-scripts` 導入）。ユニット15＋InMemoryTransport 統合3。
+- **host.ts**（`src/main/note/`・Electron非依存）: localhost Streamable HTTP MCP ホスト（stateful・JSON応答・Bearer ローカルトークン認証）。注入 NoteClient に MCP サーバーを載せる＝note セッションはアプリ内・config に出ない。統合4件（認証/listTools/callTool/401）。
+- **bridge/note-bridge.mjs**: Claude が stdio で起動する透過中継（env の URL＋Bearer で host へ JSONRPC 素通し）。
+- **session.ts**: `NoteSessionStore`。note Cookie を safeStorage 暗号化保存（平文非保存）。loginState/getCookies/clear/markNeedsRelogin。6件。
+- **login.ts** + **electronLoginBrowser.ts**: `performNoteLogin`（純ロジック・DI・`/settings/account` の currentUser 判定・3件）＋ BrowserWindow 実装（クリーンUA＋永続パーティション）。
+- **configWriter.connectNote**: bridge エントリ（`command=node, args=[bridge], env=URL＋Bearer＋MANAGER_ID`）。秘密は載せない。disconnect/removeAllOwned は共通経路。6件。既存 WordPress 不変。
+- **noteService.ts**: 束ねるオーケストレータ。`login/connect/disconnect/logout/loginState/getUrlname/isHostRunning`。ホストは1回起動して再利用。7件。
+- **残（P6・アプリ統合）**: IPC（`note.login/logout/loginState`・`targets.*`）／`realDeps` で NoteService を配線し起動時にホスト常駐＆config 再書込／renderer UI（投稿先タイプ選択・ログイン/要再ログイン表示・同意ダイアログ・Pro gating・ベータ表示）／note 投稿先の store 永続化／**Claude Desktop 実機疎通**。bridge の配布時バンドル（同梱パス解決）も P6/配布。
 
 ## 9. ライセンス
 - note-mcp は **MIT**。移植部分は note-mcp の著作権＋MIT 許諾を `NOTICE`/`THIRD-PARTY` に明記。
