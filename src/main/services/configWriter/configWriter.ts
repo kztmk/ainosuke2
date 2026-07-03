@@ -45,8 +45,13 @@ export interface NoteConnectionInput {
   bridgeUrl: string;
   /** Bearer ローカルアクセストークン（localhost 限定・回転可・非アカウント） */
   bridgeToken: string;
-  /** bridge を起動する node 実行ファイル（既定 'node'） */
+  /** bridge を起動する node 実行ファイル（既定 'node'）。実機ではアプリ同梱 Electron を推奨。 */
   nodePath?: string;
+  /**
+   * bridge に渡す追加 env（例: `ELECTRON_RUN_AS_NODE: '1'`）。
+   * Claude Desktop は GUI アプリで PATH が限定的なため、同梱 Electron を node として使う場合に指定する。
+   */
+  extraEnv?: Record<string, string>;
 }
 
 export const NOTE_BRIDGE_URL_ENV = 'NOTE_BRIDGE_URL';
@@ -87,6 +92,7 @@ function buildNoteEntry(input: NoteConnectionInput): McpServerEntry {
     command: input.nodePath ?? 'node',
     args: [input.bridgePath],
     env: {
+      ...input.extraEnv,
       [NOTE_BRIDGE_URL_ENV]: input.bridgeUrl,
       [NOTE_BRIDGE_TOKEN_ENV]: input.bridgeToken,
       [MANAGER_ID_ENV]: input.managerId,

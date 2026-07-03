@@ -20,8 +20,10 @@ export interface NoteServiceDeps {
   configWriter: ConfigWriter;
   /** 同梱 note-bridge.mjs の絶対パス（config に書く）。 */
   bridgePath: string;
-  /** bridge を起動する node 実行ファイル（既定 'node'）。 */
+  /** bridge を起動する node 実行ファイル（既定 'node'）。実機ではアプリ同梱 Electron を推奨。 */
   nodePath?: string;
+  /** bridge へ渡す追加 env（例: `ELECTRON_RUN_AS_NODE: '1'`）。 */
+  extraEnv?: Record<string, string>;
   /** ホスト起動（Electron 側は startNoteHost を渡す）。 */
   startHost: (client: NoteClient) => Promise<NoteHost>;
   /** ログイン窓を作る（Electron 側は createNoteLoginBrowser を渡す）。 */
@@ -83,6 +85,7 @@ export class NoteService {
       bridgeUrl: host.url,
       bridgeToken: host.token,
       nodePath: this.deps.nodePath,
+      extraEnv: this.deps.extraEnv,
     });
   }
 

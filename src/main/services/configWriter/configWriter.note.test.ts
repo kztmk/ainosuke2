@@ -62,6 +62,17 @@ describe('connectNote', () => {
     expect((await read()).mcpServers!['note: ぶんご']!.command).toBe('/usr/local/bin/node');
   });
 
+  it('extraEnv（ELECTRON_RUN_AS_NODE 等）を env に合流する', async () => {
+    await writer.connectNote(input({ nodePath: '/app/Electron', extraEnv: { ELECTRON_RUN_AS_NODE: '1' } }));
+    const entry = (await read()).mcpServers!['note: ぶんご']!;
+    expect(entry.command).toBe('/app/Electron');
+    expect(entry.env).toMatchObject({
+      ELECTRON_RUN_AS_NODE: '1',
+      [NOTE_BRIDGE_URL_ENV]: 'http://127.0.0.1:51234/mcp',
+      [MANAGER_ID_ENV]: 'mgr-1',
+    });
+  });
+
   it('同一 managerId への再接続は冪等更新（URL/token を差し替え）', async () => {
     await writer.connectNote(input());
     await writer.connectNote(input({ bridgeUrl: 'http://127.0.0.1:60000/mcp', bridgeToken: 'tok-new' }));

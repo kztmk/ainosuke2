@@ -145,15 +145,22 @@ export function buildAppService(
 
 /**
  * 同梱 note-bridge.mjs の絶対パスを解決する。
- * ※ 配布時は bridge と @modelcontextprotocol/sdk を asarUnpack/resources に含める必要がある（P6/配布 TODO）。
+ * - dev: ソースの bridge（SDK は node_modules から解決）
+ * - packaged: resources 直下に置いた自己完結バンドル（esbuild で SDK を inline・asarUnpack 不要）
  */
 function resolveNoteBridgePath(): string {
+  if (app.isPackaged) {
+    return path.join(process.resourcesPath, 'note-bridge.mjs');
+  }
   return path.join(app.getAppPath(), 'src', 'main', 'note', 'bridge', 'note-bridge.mjs');
 }
 
 /**
  * NoteController を組み立てる（ADR-0008 D）。config は WordPress と同じ claude_desktop_config.json。
  * note セッションは safeStorage 暗号化保存。ホスト起動/ログイン窓は Electron 実装を注入。
+ *
+ * bridge の起動は「アプリ同梱の Electron を ELECTRON_RUN_AS_NODE=1 で node として使う」。
+ * Claude Desktop は GUI アプリで PATH が限定的なため、system の node に依存しない同梱バイナリが堅実。
  */
 export function buildNoteController(configPath: string): NoteController {
   const store = new Store();
@@ -167,6 +174,8 @@ export function buildNoteController(configPath: string): NoteController {
     session: new NoteSessionStore(kv, safeStorage),
     configWriter: new ConfigWriter(configPath),
     bridgePath: resolveNoteBridgePath(),
+    nodePath: process.execPath, // アプリ同梱 Electron バイナリ
+    extraEnv: { ELECTRON_RUN_AS_NODE: '1' }, // Electron を純 node として起動
     startHost: (client) => startNoteHost(client),
     createLoginBrowser: () => createNoteLoginBrowser(),
   });
