@@ -14,7 +14,8 @@ const dot: Record<HealthStatus, string> = {
 };
 
 export function Sidebar({ onAdd }: { onAdd: () => void }): JSX.Element {
-  const { sites, selectedId, selectSite, setView, view, reorder, warningsFor } = useApp();
+  const { sites, selectedId, selectSite, setView, view, reorder, warningsFor, noteStatus, noteSelected, selectNote } =
+    useApp();
   const { t } = useTranslation();
   const [dragId, setDragId] = useState<string | null>(null);
 
@@ -69,6 +70,32 @@ export function Sidebar({ onAdd }: { onAdd: () => void }): JSX.Element {
         >
           {t('sidebar.addSite')}
         </button>
+
+        {/* note 投稿先（単一アカウント・ADR-0008 D） */}
+        <div className="mt-3 border-t border-zinc-100 pt-2 dark:border-zinc-800">
+          <p className="px-2 pb-1 text-[10px] uppercase tracking-wide text-zinc-400">{t('sidebar.otherPlatforms')}</p>
+          <button
+            onClick={() => {
+              selectNote();
+              setView('main');
+            }}
+            className={cn(
+              'flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-sm',
+              view === 'main' && noteSelected ? 'bg-zinc-100 dark:bg-zinc-800' : 'hover:bg-zinc-50 dark:hover:bg-zinc-900',
+            )}
+          >
+            <span className={noteStatus?.loginState === 'logged_in' ? dot.ok : dot.unverified}>●</span>
+            <span className="flex-1 truncate text-left">
+              {noteStatus?.urlname ? `note: ${noteStatus.urlname}` : t('note.section')}
+            </span>
+            <span className="rounded bg-amber-100 px-1 py-0.5 text-[9px] font-medium text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+              {t('note.beta')}
+            </span>
+            {noteStatus?.connected && (
+              <span className="text-[10px] text-green-600 dark:text-green-400">{t('sidebar.connected')}</span>
+            )}
+          </button>
+        </div>
       </nav>
 
       <div className="border-t border-zinc-200 p-2 text-sm dark:border-zinc-800">

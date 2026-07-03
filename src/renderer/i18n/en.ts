@@ -37,6 +37,7 @@ export const en = {
   sidebar: {
     addSite: '＋ Add site',
     connected: 'Connected',
+    otherPlatforms: 'Other platforms',
   },
   banner: {
     claudeNotFound:

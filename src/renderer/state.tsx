@@ -3,7 +3,7 @@
  */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { AppSettings, Site, SiteWarning, ThemePref, WarningType } from '../shared/domain.js';
-import type { SiteInput, TestResult } from '../shared/ipc.js';
+import type { NoteStatus, SiteInput, TestResult } from '../shared/ipc.js';
 import i18n from './i18n/index.js';
 
 /** main から返る reason コードをローカライズ（無ければ素のメッセージにフォールバック）。 */
@@ -37,6 +37,13 @@ interface AppState {
   warningsFor: (siteId: string) => WarningType[];
 
   selected: Site | null;
+
+  /** note 投稿先（単一アカウント）の状態と選択（ADR-0008 D）。 */
+  noteStatus: NoteStatus | null;
+  noteSelected: boolean;
+  selectNote: () => void;
+  reloadNote: () => Promise<void>;
+
   setView: (v: View) => void;
   selectSite: (id: string | null) => void;
   reload: () => Promise<void>;
@@ -73,6 +80,8 @@ export function AppStateProvider({ children }: { children: ReactNode }): JSX.Ele
   const [toast, setToast] = useState<Toast | null>(null);
   const [alert, setAlert] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<SiteWarning[]>([]);
+  const [noteStatus, setNoteStatus] = useState<NoteStatus | null>(null);
+  const [noteSelected, setNoteSelected] = useState(false);
 
   const reload = useCallback(async () => {
     const [list, w] = await Promise.all([window.api.sites.list(), window.api.warnings.list()]);
@@ -80,20 +89,26 @@ export function AppStateProvider({ children }: { children: ReactNode }): JSX.Ele
     setWarnings(w);
   }, []);
 
+  const reloadNote = useCallback(async () => {
+    setNoteStatus(await window.api.note.status());
+  }, []);
+
   useEffect(() => {
     void (async () => {
-      const [list, w, s, detected, cfg] = await Promise.all([
+      const [list, w, s, detected, cfg, note] = await Promise.all([
         window.api.sites.list(),
         window.api.warnings.list(),
         window.api.settings.get(),
         window.api.claude.detect(),
         window.api.claude.configPath(),
+        window.api.note.status(),
       ]);
       setSites(list);
       setWarnings(w);
       setSettings(s);
       setClaudeDetected(detected);
       setConfigPath(cfg);
+      setNoteStatus(note);
       applyTheme(s.theme);
       void i18n.changeLanguage(s.language);
       if (list.length > 0) setSelectedId((prev) => prev ?? list[0]!.id);
@@ -220,6 +235,17 @@ export function AppStateProvider({ children }: { children: ReactNode }): JSX.Ele
     void window.api.shell.openExternal(url);
   }, []);
 
+  const selectSite = useCallback<AppState['selectSite']>((id) => {
+    setSelectedId(id);
+    setNoteSelected(false);
+  }, []);
+
+  const selectNote = useCallback<AppState['selectNote']>(() => {
+    setNoteSelected(true);
+    setSelectedId(null);
+    void reloadNote();
+  }, [reloadNote]);
+
   const value: AppState = {
     sites,
     selectedId,
@@ -232,8 +258,12 @@ export function AppStateProvider({ children }: { children: ReactNode }): JSX.Ele
     warnings,
     warningsFor,
     selected,
+    noteStatus,
+    noteSelected,
+    selectNote,
+    reloadNote,
     setView,
-    selectSite: setSelectedId,
+    selectSite,
     reload,
     showToast: setToast,
     showAlert: setAlert,

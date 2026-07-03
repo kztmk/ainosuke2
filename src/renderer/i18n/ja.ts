@@ -36,6 +36,7 @@ export const ja = {
   sidebar: {
     addSite: '＋ サイトを追加',
     connected: '接続中',
+    otherPlatforms: 'その他の投稿先',
   },
   banner: {
     claudeNotFound:

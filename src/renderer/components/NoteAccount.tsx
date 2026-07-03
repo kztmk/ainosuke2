@@ -11,7 +11,7 @@ import { Button, Card, Modal, Toggle } from './ui.js';
 
 const CONSENT_KEY = 'note.consent.v1';
 
-export function NoteAccount(): JSX.Element {
+export function NoteAccount({ onChanged }: { onChanged?: () => void } = {}): JSX.Element {
   const { t } = useTranslation();
   const [status, setStatus] = useState<NoteStatus | null>(null);
   const [busy, setBusy] = useState(false);
@@ -21,7 +21,8 @@ export function NoteAccount(): JSX.Element {
 
   const refresh = useCallback(async () => {
     setStatus(await window.api.note.status());
-  }, []);
+    onChanged?.();
+  }, [onChanged]);
   useEffect(() => {
     void refresh();
   }, [refresh]);

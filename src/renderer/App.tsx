@@ -8,12 +8,13 @@ import { SiteDialog } from './components/SiteDialog.js';
 import { SettingsView } from './components/SettingsView.js';
 import { LogView } from './components/LogView.js';
 import { TemplatesView } from './components/TemplatesView.js';
+import { NoteAccount } from './components/NoteAccount.js';
 import { Button, Modal } from './components/ui.js';
 
 type DialogState = { mode: 'add' } | { mode: 'edit'; site: Site } | null;
 
 export function App(): JSX.Element {
-  const { view, selected, claudeDetected, toast, showToast, alert, showAlert } = useApp();
+  const { view, selected, noteSelected, reloadNote, claudeDetected, toast, showToast, alert, showAlert } = useApp();
   const { t } = useTranslation();
   const [dialog, setDialog] = useState<DialogState>(null);
 
@@ -29,7 +30,14 @@ export function App(): JSX.Element {
         )}
 
         {view === 'main' &&
-          (selected ? (
+          (noteSelected ? (
+            <div className="flex-1 space-y-4 overflow-y-auto p-6">
+              <h2 className="text-lg font-semibold">{t('note.section')}</h2>
+              <div className="max-w-lg">
+                <NoteAccount onChanged={() => void reloadNote()} />
+              </div>
+            </div>
+          ) : selected ? (
             <SiteDetail site={selected} onEdit={() => setDialog({ mode: 'edit', site: selected })} />
           ) : (
             <div className="flex flex-1 items-center justify-center text-sm text-zinc-500">
