@@ -185,7 +185,17 @@ ADR-0008 D の実行経路を実装・テスト。**フルチェーン e2e**（C
   1. **投稿先一覧への統合**（Sidebar/SiteDetail を PostTarget union で一般化し、note をサイトと並べて表示・プラットフォーム選択で追加）。現状は設定画面の単一 note セクション。
   2. **複数 note アカウント対応**（note 投稿先ストア。現状は 1 アカウント固定）。
   3. **Claude Desktop 実機疎通**（接続→Claude 再起動→note ツール実行の往復）。
-  4. **配布バンドル**: `note-bridge.mjs` と `@modelcontextprotocol/sdk` を asarUnpack/resources に含め、`resolveNoteBridgePath` を packaged パスへ対応（dev は `app.getAppPath()/src/...` で動作）。
+  4. ~~配布バンドル~~ → ③④で対応済（下記）。残りは electron-builder 本体の設定。
+
+### ③ Claude 実機起動の堅牢化（2026-07-02・dedce62）
+- Claude Desktop は GUI アプリで PATH が限定的（`node` を見つけられないことが多い）。→ bridge を **アプリ同梱 Electron を `ELECTRON_RUN_AS_NODE=1` で node 化**して起動する。configWriter に `extraEnv`、realDeps は `nodePath=process.execPath`＋`extraEnv={ELECTRON_RUN_AS_NODE:'1'}`。
+- **バンドル版 bridge を electron-as-node で起動しフルチェーン e2e が通ることを確認**（実 Claude と同方式）。
+- **実機の往復確認（ユーザー操作・未実施）**: dev で `npm run dev` → サイドバー note → ログイン → 接続 → `claude_desktop_config.json` にエントリ確認 → Claude 再起動 → Claude から note ツール実行。
+
+### ④ bridge 自己完結バンドル（2026-07-02・dedce62）
+- `scripts/bundle-bridge.mjs`（esbuild）で `note-bridge.mjs` を **SDK inline の自己完結 ESM（278KB・node_modules 不要）** に。`npm run build` に `build:bridge` を組込み（出力 `out/bridge/note-bridge.mjs`）。
+- `resolveNoteBridgePath`: dev=ソース bridge（SDK は node_modules）、packaged=`process.resourcesPath/note-bridge.mjs`（バンドル）。
+- **配布時の残作業（electron-builder 未設定）**: electron-builder 導入時に `extraResources` で `out/bridge/note-bridge.mjs` を resources 直下へコピー。バンドルは自己完結なので asarUnpack 不要。`command=process.execPath`（packaged Electron）＋`ELECTRON_RUN_AS_NODE=1` で起動。
 
 ## 9. ライセンス
 - note-mcp は **MIT**。移植部分は note-mcp の著作権＋MIT 許諾を `NOTICE`/`THIRD-PARTY` に明記。
