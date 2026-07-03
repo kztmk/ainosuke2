@@ -93,7 +93,7 @@ type PostTarget = WordPressTarget | NoteTarget;
 | P3 | 本文HTML忠実度 | ✅**双方向 完了(2026-07-02)** markdown⇄note HTML（markdown-it＋note固有変換／逆変換は往復一致）。exotic記法(TOC/整列/株式/埋込)は残。 | 双方向済 |
 | P4 | アイキャッチ | upload_eyecatch（presigned） | 1 |
 | P5 | 常駐ホスト＋ブリッジ＋config | ✅**中核完了(2026-07-02)** tools/server/host/bridge/session/login/configWriter分岐/NoteService。フルチェーンe2e済。残=IPC/realDeps/renderer(P6)・Claude実機。 | 中核済 |
-| P6 | UI/状態/同意＋テスト | プラットフォーム選択・要再ログイン表示・同意・Pro gating・テスト | 2〜3 |
+| P6 | UI/状態/同意＋テスト | ✅**初版(2026-07-02)** note IPC＋main配線＋NoteController＋設定画面のNoteAccount（ログイン/接続/同意/ベータ）。残=投稿先一覧統合・複数アカウントstore・Claude実機・配布バンドル。 | 初版済 |
 
 v1 は P0〜P2＋P4＋P5＋P6 で「ログイン→下書き作成/更新/一覧/公開＋アイキャッチが Claude から動く」。P3 は忠実度を継続改善。
 
@@ -174,6 +174,18 @@ ADR-0008 D の実行経路を実装・テスト。**フルチェーン e2e**（C
 - **configWriter.connectNote**: bridge エントリ（`command=node, args=[bridge], env=URL＋Bearer＋MANAGER_ID`）。秘密は載せない。disconnect/removeAllOwned は共通経路。6件。既存 WordPress 不変。
 - **noteService.ts**: 束ねるオーケストレータ。`login/connect/disconnect/logout/loginState/getUrlname/isHostRunning`。ホストは1回起動して再利用。7件。
 - **残（P6・アプリ統合）**: IPC（`note.login/logout/loginState`・`targets.*`）／`realDeps` で NoteService を配線し起動時にホスト常駐＆config 再書込／renderer UI（投稿先タイプ選択・ログイン/要再ログイン表示・同意ダイアログ・Pro gating・ベータ表示）／note 投稿先の store 永続化／**Claude Desktop 実機疎通**。bridge の配布時バンドル（同梱パス解決）も P6/配布。
+
+## P6 実装メモ（2026-07-02・初版：note を UI から使える状態）
+- **IPC**（`ipc.ts`）: `note.status/login/logout/connect/disconnect` ＋型（NoteStatus/NoteLoginResult/NoteConnectResult）＋チャンネル。preload で公開。registerHandlers の `ExtraHandlers.note` に結線。
+- **NoteController**（`src/main/note/noteController.ts`）: 「1 アプリ = 1 note アカウント」ポリシー。managerId 永続・connected フラグ・`resumeOnStartup`（起動時にログイン中＆接続中なら host URL/token を config 再反映）・dispose。DI で10件テスト。
+- **realDeps.buildNoteController** ＋ main 配線: 起動時に構築＋resumeOnStartup、終了時 dispose。config は WordPress と同一の claude_desktop_config.json。
+- **renderer**（`NoteAccount.tsx`・設定画面）: ログイン状態表示、ログインボタン（初回に非公式 API 同意ダイアログ）、接続トグル、ログアウト、Pro/ベータバッジ、接続後の再起動案内。i18n（note.\*）ja/en。
+- **electron-vite build 通過**（main に note-core/markdown-it/SDK をバンドル）。
+- **残（P6 の続き）**:
+  1. **投稿先一覧への統合**（Sidebar/SiteDetail を PostTarget union で一般化し、note をサイトと並べて表示・プラットフォーム選択で追加）。現状は設定画面の単一 note セクション。
+  2. **複数 note アカウント対応**（note 投稿先ストア。現状は 1 アカウント固定）。
+  3. **Claude Desktop 実機疎通**（接続→Claude 再起動→note ツール実行の往復）。
+  4. **配布バンドル**: `note-bridge.mjs` と `@modelcontextprotocol/sdk` を asarUnpack/resources に含め、`resolveNoteBridgePath` を packaged パスへ対応（dev は `app.getAppPath()/src/...` で動作）。
 
 ## 9. ライセンス
 - note-mcp は **MIT**。移植部分は note-mcp の著作権＋MIT 許諾を `NOTICE`/`THIRD-PARTY` に明記。
